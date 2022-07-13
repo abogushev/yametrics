@@ -111,7 +111,7 @@ func mkURL(m *Metrics) []string {
 		arr[i] = fmt.Sprintf("http://127.0.0.1:8080/update/gauge/%s/%v", key, v)
 		i++
 	}
-	arr[len(arr)] = fmt.Sprintf("http://127.0.0.1:8080/update/counter/%s/%v", "PollCount", m.PollCount)
+	arr[len(arr)-1] = fmt.Sprintf("http://127.0.0.1:8080/update/counter/%s/%v", "PollCount", m.PollCount)
 
 	return arr
 }
