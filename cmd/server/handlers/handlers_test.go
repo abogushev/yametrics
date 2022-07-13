@@ -29,7 +29,7 @@ func TestHandleGuage(t *testing.T) {
 			h := http.HandlerFunc(HandleGuage(metricsStorage))
 			h.ServeHTTP(w, request)
 			res := w.Result()
-
+			res.Body.Close()
 			assert.Equal(t, res.StatusCode, tt.code, "wrong status")
 		})
 	}
@@ -50,6 +50,7 @@ func TestHandleCounter(t *testing.T) {
 			h := http.HandlerFunc(HandleCounter(counterStorage))
 			h.ServeHTTP(w, request)
 			res := w.Result()
+			res.Body.Close()
 
 			assert.Equal(t, res.StatusCode, tt.code, "wrong status")
 		})
