@@ -30,7 +30,7 @@ func TestHandleGuage(t *testing.T) {
 			h.ServeHTTP(w, request)
 			res := w.Result()
 			res.Body.Close()
-			assert.Equal(t, res.StatusCode, tt.code, "wrong status")
+			assert.Equal(t, tt.code, res.StatusCode, "wrong status")
 		})
 	}
 }

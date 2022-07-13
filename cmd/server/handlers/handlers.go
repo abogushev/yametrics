@@ -9,7 +9,7 @@ import (
 
 func HandleGuage(storage storage.GuageStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.Split(r.URL.Path, "/")
+		path := strings.Split(strings.ReplaceAll(r.URL.Path, "/update/gauge/", ""), "/")
 		if len(path) != 2 {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
@@ -25,7 +25,7 @@ func HandleGuage(storage storage.GuageStorage) http.HandlerFunc {
 }
 func HandleCounter(storage storage.CounterStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.Split(r.URL.Path, "/")
+		path := strings.Split(strings.ReplaceAll(r.URL.Path, "/update/counter/", ""), "/")
 		if len(path) != 2 {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
