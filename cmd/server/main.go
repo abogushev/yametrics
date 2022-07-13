@@ -23,8 +23,7 @@ func main() {
 	r.Route("/update", func(r chi.Router) {
 		r.Post("/gauge/{name}/{value}", handlers.PostGuage(metricsStorage))
 		r.Post("/counter/{name}/{value}", handlers.PostCounter(countersStorage))
-		r.Post("/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
-
+		r.Post("/*", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
 	})
 
 	r.Route("/value", func(r chi.Router) {
