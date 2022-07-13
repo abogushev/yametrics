@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +31,13 @@ func TestHandleGuage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			rctx := chi.NewRouteContext()
+			rctx.URLParams.Add("name", "metric_name")
+			rctx.URLParams.Add("value", "1")
+
 			request := httptest.NewRequest(http.MethodPost, "/update/gauge/metric_name/1", nil)
+			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
+
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(PostGuage(metricsStorage))
 			h.ServeHTTP(w, request)
@@ -50,7 +58,13 @@ func TestHandleCounter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			rctx := chi.NewRouteContext()
+			rctx.URLParams.Add("name", "metric_name")
+			rctx.URLParams.Add("value", "1")
+
 			request := httptest.NewRequest(http.MethodPost, "/update/counter/metric_name/1", nil)
+			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, rctx))
+
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(PostCounter(counterStorage))
 			h.ServeHTTP(w, request)
