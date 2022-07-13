@@ -17,20 +17,26 @@ func PostGuage(storage storage.GuageStorage) http.HandlerFunc {
 		value := chi.URLParam(r, "value")
 		if v, err := strconv.ParseFloat(value, 64); err == nil {
 			storage.Update(name, v)
+
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
 		}
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
 	}
 }
+
 func PostCounter(storage storage.CounterStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := chi.URLParam(r, "name")
 		value := chi.URLParam(r, "value")
 		if v, error := strconv.ParseInt(value, 10, 64); error == nil {
 			storage.Update(name, v)
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
 		}
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
 	}
 }
 
