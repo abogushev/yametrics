@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"yametrics/cmd/server/storage"
+	"yametrics/internal/server/storage"
 
 	"github.com/go-chi/chi"
 )
