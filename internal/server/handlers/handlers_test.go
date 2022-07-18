@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
 )
 
 type MockGuageStorage struct {
@@ -39,8 +40,13 @@ func (s *MockCounterStorage) GetAll() map[string]int64 {
 }
 func (s *MockCounterStorage) Update(name string, value int64) {}
 
+func getLogger() *zap.SugaredLogger {
+	l, _ := zap.NewProduction()
+	return l.Sugar()
+}
+
 func TestPostGuage(t *testing.T) {
-	var storage storage.GuageStorage = new(MockGuageStorage)
+	handler := &Handler{new(MockGuageStorage), new(MockCounterStorage), getLogger()}
 	tests := []struct {
 		name string
 		code int
@@ -71,7 +77,7 @@ func TestPostGuage(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/update/gauge/metric_name/1", nil)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, tt.rctx))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(PostGuage(storage))
+			h := http.HandlerFunc(handler.PostGuage)
 			h.ServeHTTP(w, request)
 			res := w.Result()
 			res.Body.Close()
@@ -81,7 +87,8 @@ func TestPostGuage(t *testing.T) {
 }
 
 func TestPostCounter(t *testing.T) {
-	var storage storage.CounterStorage = new(MockCounterStorage)
+	handler := &Handler{new(MockGuageStorage), new(MockCounterStorage), getLogger()}
+
 	tests := []struct {
 		name string
 		code int
@@ -114,7 +121,7 @@ func TestPostCounter(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/update/gauge/metric_name/1", nil)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, tt.rctx))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(PostCounter(storage))
+			h := http.HandlerFunc(handler.PostCounter)
 			h.ServeHTTP(w, request)
 			res := w.Result()
 			res.Body.Close()
@@ -215,7 +222,8 @@ func TestGetMetric(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, tt.rctx))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(GetMetric(tt.guageStorage, tt.counterStorage))
+			handler := &Handler{tt.guageStorage, tt.counterStorage, getLogger()}
+			h := http.HandlerFunc(handler.GetMetric)
 			h.ServeHTTP(w, request)
 			res := w.Result()
 			res.Body.Close()
