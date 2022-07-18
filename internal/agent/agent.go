@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"os/signal"
 	"runtime"
-	"syscall"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type Metrics struct {
@@ -17,16 +17,14 @@ type Metrics struct {
 	RandomValue float64
 }
 
-func Run() {
+var logger *zap.SugaredLogger
+
+func Run(ctx context.Context, l *zap.SugaredLogger) {
 	mtrcs := &Metrics{&runtime.MemStats{}, 0, 0.0}
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	defer cancel()
-
+	logger = l
 	go updateMetricsWithInterval(mtrcs, ctx)
 	go sendMetricsWithInterval(mtrcs, ctx)
-
-	<-ctx.Done()
+	logger.Info("agent started")
 }
 
 func schedule(f func(), ctx context.Context, duration time.Duration, name string) {
@@ -38,7 +36,7 @@ func schedule(f func(), ctx context.Context, duration time.Duration, name string
 
 		case <-ctx.Done():
 			ticker.Stop()
-			fmt.Printf("cancel task %s\n", name)
+			logger.Infof("cancel task: %s", name)
 			return
 		}
 	}
@@ -67,6 +65,7 @@ func sendMetrics(m *Metrics) {
 	for i := 0; i < len(urls); i++ {
 		r, err := client.Post(urls[i], "text/plain", nil)
 		if err != nil {
+			logger.Errorf("error in send metric: %s", err)
 			fmt.Println(err)
 		} else {
 			r.Body.Close()

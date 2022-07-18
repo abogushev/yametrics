@@ -3,44 +3,46 @@ package handlers
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"strconv"
 	"yametrics/internal/server/storage"
 
 	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
-func PostGuage(storage storage.GuageStorage) http.HandlerFunc {
+func PostGuage(storage storage.GuageStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := chi.URLParam(r, "name")
 		value := chi.URLParam(r, "value")
-		if v, err := strconv.ParseFloat(value, 64); err == nil {
-			storage.Update(name, v)
 
+		if v, err := strconv.ParseFloat(value, 64); err == nil && name != "" {
+			storage.Update(name, v)
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusOK)
 		} else {
+			logger.Errorf("wrong params: name=%v, value=%v", name, value)
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	}
 }
 
-func PostCounter(storage storage.CounterStorage) http.HandlerFunc {
+func PostCounter(storage storage.CounterStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := chi.URLParam(r, "name")
 		value := chi.URLParam(r, "value")
-		if v, error := strconv.ParseInt(value, 10, 64); error == nil {
+		if v, error := strconv.ParseInt(value, 10, 64); error == nil && name != "" {
 			storage.Update(name, v)
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusOK)
 		} else {
+			logger.Errorf("wrong params: name=%v, value=%v", name, value)
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	}
 }
 
-func GetMetric(guageStorage storage.GuageStorage, counterStorage storage.CounterStorage) http.HandlerFunc {
+func GetMetric(guageStorage storage.GuageStorage, counterStorage storage.CounterStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "type")
 		metricName := chi.URLParam(r, "name")
@@ -60,7 +62,12 @@ func GetMetric(guageStorage storage.GuageStorage, counterStorage storage.Counter
 			if found {
 				result = fmt.Sprintf("%v", v)
 			}
+		default:
+			logger.Errorf("wrong metric type: %v", metricType)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
+
 		if found {
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusOK)
@@ -71,7 +78,7 @@ func GetMetric(guageStorage storage.GuageStorage, counterStorage storage.Counter
 	}
 }
 
-func GetAllAsHTML(guageStorage storage.GuageStorage, counterStorage storage.CounterStorage) http.HandlerFunc {
+func GetAllAsHTML(guageStorage storage.GuageStorage, counterStorage storage.CounterStorage, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		allmtrcs := []string{}
 		for n, v := range guageStorage.GetAll() {
@@ -94,14 +101,14 @@ func GetAllAsHTML(guageStorage storage.GuageStorage, counterStorage storage.Coun
 		</html>`)
 
 		if err != nil {
-			log.Fatal("Error Parsing template: ", err)
+			logger.Error("Error Parsing template: ", err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		err1 := tmpl.Execute(w, allmtrcs)
 		if err1 != nil {
-			log.Fatal("Error executing template: ", err1)
+			logger.Error("Error executing template: ", err1)
 		}
 	}
 }
