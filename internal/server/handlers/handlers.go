@@ -12,9 +12,9 @@ import (
 )
 
 type Handler struct {
-	storage.GuageStorage
-	storage.CounterStorage
-	Logger *zap.SugaredLogger
+	GuageStorage   storage.GuageStorage
+	CounterStorage storage.CounterStorage
+	Logger         *zap.SugaredLogger
 }
 
 func (h *Handler) PostGuage(w http.ResponseWriter, r *http.Request) {

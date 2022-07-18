@@ -14,7 +14,7 @@ import (
 func Run() {
 	l, _ := zap.NewProduction()
 	defer l.Sync() // flushes buffer, if any
-	handler := &handlers.Handler{storage.NewGuageStorage(), storage.NewCounterStorage(), l.Sugar()}
+	handler := &handlers.Handler{GuageStorage: storage.NewGuageStorage(), CounterStorage: storage.NewCounterStorage(), Logger: l.Sugar()}
 
 	r := chi.NewRouter()
 
