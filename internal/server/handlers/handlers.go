@@ -121,15 +121,16 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
-	allmtrcs := []string{}
 	storageMetrics := h.metricsStorage.GetAll()
+	allmtrcs := make([]string, len(storageMetrics))
+
 	for v, i := "", 0; i < len(storageMetrics); i++ {
 		if storageMetrics[i].MType == models.GAUGE {
 			v = fmt.Sprintf("%v", *storageMetrics[i].Value)
 		} else {
 			v = fmt.Sprintf("%v", *storageMetrics[i].Delta)
 		}
-		allmtrcs = append(allmtrcs, fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v))
+		allmtrcs[i] = fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v)
 	}
 
 	tmpl, err := template.New("test").Parse(`
