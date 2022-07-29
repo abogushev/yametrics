@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -198,12 +199,15 @@ func TestGetV1(t *testing.T) {
 	existMetricName := "existMetricName"
 	ubsentMetricName := "ubsentMetricName"
 	var i int64 = 1
-	f := 1.0
+	f := 1.1
+	gaugeResponse := "1.1"
+	counterResponse := "1"
 	model := models.Metrics{ID: "1", MType: models.GAUGE, Value: &f, Delta: &i}
 	tests := []struct {
 		name          string
 		metricStorage storage.MetricsStorage
 		code          int
+		result        *string
 		rctx          *chi.Context
 	}{
 		{
@@ -214,6 +218,7 @@ func TestGetV1(t *testing.T) {
 				return r
 			}(),
 			200,
+			&gaugeResponse,
 			func() *chi.Context {
 				rctx := chi.NewRouteContext()
 				rctx.URLParams.Add("type", gaugeType)
@@ -229,6 +234,7 @@ func TestGetV1(t *testing.T) {
 				return r
 			}(),
 			404,
+			nil,
 			func() *chi.Context {
 				rctx := chi.NewRouteContext()
 				rctx.URLParams.Add("type", gaugeType)
@@ -240,6 +246,7 @@ func TestGetV1(t *testing.T) {
 			"guage, 400 Bad Request",
 			new(MockMetricStorage),
 			400,
+			nil,
 			chi.NewRouteContext(),
 		},
 		{
@@ -250,6 +257,7 @@ func TestGetV1(t *testing.T) {
 				return r
 			}(),
 			200,
+			&counterResponse,
 			func() *chi.Context {
 				rctx := chi.NewRouteContext()
 				rctx.URLParams.Add("type", counterType)
@@ -265,6 +273,7 @@ func TestGetV1(t *testing.T) {
 				return r
 			}(),
 			404,
+			nil,
 			func() *chi.Context {
 				rctx := chi.NewRouteContext()
 				rctx.URLParams.Add("type", counterType)
@@ -282,8 +291,17 @@ func TestGetV1(t *testing.T) {
 			h := http.HandlerFunc(handler.GetV1)
 			h.ServeHTTP(w, request)
 			res := w.Result()
-			res.Body.Close()
+
+			defer res.Body.Close()
+
 			assert.Equal(t, tt.code, res.StatusCode, "wrong status")
+
+			if tt.result != nil {
+				data, err := io.ReadAll(res.Body)
+				if assert.NoError(t, err) {
+					assert.Equal(t, *tt.result, string(data))
+				}
+			}
 		})
 	}
 }

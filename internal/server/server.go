@@ -24,8 +24,8 @@ func Run() {
 	r.Use(middleware.Recoverer)
 
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/{type}/{name}/{value}", handler.UpdateV1)
-		r.Post("/{type}/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
+		r.Post("/{type:gauge|counter}/{name}/{value}", handler.UpdateV1)
+		r.Post("/{type}/{name}/{value}", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
 		// r.Post("/*", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
 		r.Post("/", handler.UpdateV2)
 	})

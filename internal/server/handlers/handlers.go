@@ -97,12 +97,12 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	case "gauge":
 		metric, found = h.metricsStorage.Get(metricName)
 		if found {
-			result = fmt.Sprintf("%v", metric.Value)
+			result = fmt.Sprintf("%v", *metric.Value)
 		}
 	case "counter":
 		metric, found = h.metricsStorage.Get(metricName)
 		if found {
-			result = fmt.Sprintf("%v", metric.Delta)
+			result = fmt.Sprintf("%v", *metric.Delta)
 		}
 	default:
 		h.logger.Errorf("wrong metric type: %v", metricType)
@@ -125,9 +125,9 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	storageMetrics := h.metricsStorage.GetAll()
 	for v, i := "", 0; i < len(storageMetrics); i++ {
 		if storageMetrics[i].MType == models.GAUGE {
-			v = fmt.Sprintf("%v", storageMetrics[i].Value)
+			v = fmt.Sprintf("%v", *storageMetrics[i].Value)
 		} else {
-			v = fmt.Sprintf("%v", storageMetrics[i].Delta)
+			v = fmt.Sprintf("%v", *storageMetrics[i].Delta)
 		}
 		allmtrcs = append(allmtrcs, fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v))
 	}
