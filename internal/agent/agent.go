@@ -1,33 +1,48 @@
 package agent
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"runtime"
 	"time"
 
+	"yametrics/internal/agent/models/storage"
+
 	"go.uber.org/zap"
 )
 
-type Metrics struct {
-	*runtime.MemStats
-	PollCount   int64
-	RandomValue float64
+type Agent struct {
+	url     string
+	client  http.Client
+	logger  *zap.SugaredLogger
+	metrics *storage.Metrics
 }
 
-var logger *zap.SugaredLogger
-
-func Run(ctx context.Context, l *zap.SugaredLogger) {
-	mtrcs := &Metrics{&runtime.MemStats{}, 0, 0.0}
-	logger = l
-	go updateMetricsWithInterval(mtrcs, ctx)
-	go sendMetricsWithInterval(mtrcs, ctx)
-	logger.Info("agent started")
+func NewAgent() *Agent {
+	logger, _ := zap.NewProduction()
+	return &Agent{
+		url:     "http://127.0.0.1:8080",
+		client:  http.Client{},
+		logger:  logger.Sugar(),
+		metrics: &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
+	}
 }
 
-func schedule(f func(), ctx context.Context, duration time.Duration, name string) {
+func (agent *Agent) RunSync(ctx context.Context) {
+	defer agent.logger.Sync() // flushes buffer, if any
+
+	go agent.updateMetricsWithInterval(ctx)
+	go agent.sendMetricsWithInterval(ctx)
+	agent.logger.Info("agent started")
+	<-ctx.Done()
+	agent.logger.Info("agent stoped")
+}
+
+func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
 	ticker := time.NewTicker(duration)
 	for {
 		select {
@@ -36,81 +51,56 @@ func schedule(f func(), ctx context.Context, duration time.Duration, name string
 
 		case <-ctx.Done():
 			ticker.Stop()
-			logger.Infof("cancel task: %s", name)
+			agent.logger.Infof("cancel task: %s", name)
 			return
 		}
 	}
 }
 
-func updateMetricsWithInterval(m *Metrics, ctx context.Context) {
-	schedule(
+func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
+	agent.schedule(
 		func() {
-			runtime.ReadMemStats(m.MemStats)
-			m.PollCount++
-			m.RandomValue = rand.Float64()
+			runtime.ReadMemStats(agent.metrics.MemStats)
+			agent.metrics.PollCount++
+			agent.metrics.RandomValue = rand.Float64()
 		},
 		ctx,
 		2*time.Second,
 		"collecting metrics")
 }
 
-func sendMetricsWithInterval(m *Metrics, ctx context.Context) {
-	schedule(func() { sendMetrics(m) }, ctx, 10*time.Second, "sending metrics")
+func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
+	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2() }, ctx, 10*time.Second, "sending metrics")
 }
 
-func sendMetrics(m *Metrics) {
-	client := http.Client{}
-	urls := mkURL(m)
-
-	for i := 0; i < len(urls); i++ {
-		r, err := client.Post(urls[i], "text/plain", nil)
-		if err != nil {
-			logger.Errorf("error in send metric: %s", err)
-			fmt.Println(err)
+func (agent *Agent) sendMetricsV2() {
+	apiMetrics := agent.metrics.ToAPI()
+	for i := 0; i < len(apiMetrics); i++ {
+		if json, err := json.Marshal(apiMetrics[i]); err != nil {
+			agent.logger.Errorf("error in Marshal metric: %s", err)
+		} else if r, err := agent.client.Post(fmt.Sprintf("%s/update", agent.url), "application/json", bytes.NewBuffer(json)); err != nil {
+			agent.logger.Errorf("error in send metric: %s", err)
 		} else {
 			r.Body.Close()
 		}
 	}
 }
 
-func mkURL(m *Metrics) []string {
-	m2v := make(map[string]interface{})
-	m2v["Alloc"] = m.Alloc
-	m2v["BuckHashSys"] = m.BuckHashSys
-	m2v["Frees"] = m.Frees
-	m2v["GCCPUFraction"] = m.GCCPUFraction
-	m2v["GCSys"] = m.GCSys
-	m2v["HeapAlloc"] = m.HeapAlloc
-	m2v["HeapIdle"] = m.HeapIdle
-	m2v["HeapInuse"] = m.HeapInuse
-	m2v["HeapObjects"] = m.HeapObjects
-	m2v["HeapReleased"] = m.HeapReleased
-	m2v["HeapSys"] = m.HeapSys
-	m2v["LastGC"] = m.LastGC
-	m2v["Lookups"] = m.Lookups
-	m2v["MCacheInuse"] = m.MCacheInuse
-	m2v["MCacheSys"] = m.MCacheSys
-	m2v["MSpanInuse"] = m.MSpanInuse
-	m2v["MSpanSys"] = m.MSpanSys
-	m2v["Mallocs"] = m.Mallocs
-	m2v["NextGC"] = m.NextGC
-	m2v["NumForcedGC"] = m.NumForcedGC
-	m2v["NumGC"] = m.NumGC
-	m2v["OtherSys"] = m.OtherSys
-	m2v["PauseTotalNs"] = m.PauseTotalNs
-	m2v["StackInuse"] = m.StackInuse
-	m2v["StackSys"] = m.StackSys
-	m2v["Sys"] = m.Sys
-	m2v["TotalAlloc"] = m.TotalAlloc
-	m2v["RandomValue"] = m.RandomValue
-
-	arr := make([]string, len(m2v)+1)
-	i := 0
-	for key, v := range m2v {
-		arr[i] = fmt.Sprintf("http://127.0.0.1:8080/update/gauge/%s/%v", key, v)
-		i++
+func (agent *Agent) sendMetricsV1() {
+	send := func(url string) {
+		if r, err := agent.client.Post(url, "text/plain", nil); err != nil {
+			agent.logger.Errorf("error in send metric: %s", err)
+		} else {
+			r.Body.Close()
+		}
 	}
-	arr[len(arr)-1] = fmt.Sprintf("http://127.0.0.1:8080/update/counter/%s/%v", "PollCount", m.PollCount)
 
-	return arr
+	agent.metrics.OperateOverMetricMaps(
+		func(key string, v float64) {
+			send(fmt.Sprintf("%s/update/gauge/%s/%v", agent.url, key, v))
+		},
+		func(key string, v int64) {
+			send(fmt.Sprintf("%s/update/counter/%s/%v", agent.url, key, v))
+		},
+	)
 }

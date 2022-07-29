@@ -14,7 +14,7 @@ import (
 func Run() {
 	l, _ := zap.NewProduction()
 	defer l.Sync() // flushes buffer, if any
-	handler := &handlers.Handler{GuageStorage: storage.NewGuageStorage(), CounterStorage: storage.NewCounterStorage(), Logger: l.Sugar()}
+	handler := handlers.NewHandler(l.Sugar(), storage.NewMetricsStorageImpl())
 
 	r := chi.NewRouter()
 
@@ -24,15 +24,15 @@ func Run() {
 	r.Use(middleware.Recoverer)
 
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/gauge/{name}/{value}", handler.PostGuage)
-		r.Post("/counter/{name}/{value}", handler.PostCounter)
-		r.Post("/gauge/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
-		r.Post("/counter/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
-		r.Post("/*", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
+		r.Post("/{type}/{name}/{value}", handler.UpdateV1)
+		r.Post("/{type}/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
+		// r.Post("/*", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
+		r.Post("/", handler.UpdateV2)
 	})
 
 	r.Route("/value", func(r chi.Router) {
-		r.Get("/{type}/{name}", handler.GetMetric)
+		r.Get("/{type}/{name}", handler.GetV1)
+		r.Post("/", handler.GetV2)
 	})
 
 	r.Route("/", func(r chi.Router) {
