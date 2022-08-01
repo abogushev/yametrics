@@ -10,31 +10,34 @@ import (
 	"runtime"
 	"time"
 
+	"yametrics/internal/agent/models"
 	"yametrics/internal/agent/models/storage"
 
 	"go.uber.org/zap"
 )
 
 type Agent struct {
-	url     string
-	client  http.Client
-	logger  *zap.SugaredLogger
-	metrics *storage.Metrics
+	url            string
+	client         http.Client
+	logger         *zap.SugaredLogger
+	metrics        *storage.Metrics
+	reportInterval time.Duration
+	pollInterval   time.Duration
 }
 
-func NewAgent() *Agent {
-	logger, _ := zap.NewProduction()
+func NewAgent(l *zap.SugaredLogger, config models.AgentConfig) *Agent {
+
 	return &Agent{
-		url:     "http://127.0.0.1:8080",
-		client:  http.Client{},
-		logger:  logger.Sugar(),
-		metrics: &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
+		url:            "http://" + config.Address,
+		client:         http.Client{},
+		logger:         l,
+		metrics:        &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
+		reportInterval: config.ReportInterval,
+		pollInterval:   config.PollInterval,
 	}
 }
 
 func (agent *Agent) RunSync(ctx context.Context) {
-	defer agent.logger.Sync() // flushes buffer, if any
-
 	go agent.updateMetricsWithInterval(ctx)
 	go agent.sendMetricsWithInterval(ctx)
 	agent.logger.Info("agent started")
@@ -47,6 +50,7 @@ func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Durati
 	for {
 		select {
 		case <-ticker.C:
+			agent.logger.Infof("call task: %s", name)
 			f()
 
 		case <-ctx.Done():
@@ -65,12 +69,12 @@ func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
 			agent.metrics.RandomValue = rand.Float64()
 		},
 		ctx,
-		2*time.Second,
+		agent.pollInterval,
 		"collecting metrics")
 }
 
 func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
-	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2() }, ctx, 10*time.Second, "sending metrics")
+	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2() }, ctx, agent.reportInterval, "sending metrics")
 }
 
 func (agent *Agent) sendMetricsV2() {

@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"yametrics/internal/server/handlers"
+	"yametrics/internal/server/models"
 	"yametrics/internal/server/storage"
 
 	"github.com/go-chi/chi"
@@ -11,10 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run() {
-	l, _ := zap.NewProduction()
-	defer l.Sync() // flushes buffer, if any
-	handler := handlers.NewHandler(l.Sugar(), storage.NewMetricsStorageImpl())
+func Run(logger *zap.SugaredLogger, cfg models.ServerConfig) {
+	handler := handlers.NewHandler(logger, storage.NewMetricsStorageImpl())
 
 	r := chi.NewRouter()
 
@@ -26,7 +25,6 @@ func Run() {
 	r.Route("/update", func(r chi.Router) {
 		r.Post("/{type:gauge|counter}/{name}/{value}", handler.UpdateV1)
 		r.Post("/{type}/{name}/{value}", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
-		// r.Post("/*", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
 		r.Post("/", handler.UpdateV2)
 	})
 
@@ -40,5 +38,5 @@ func Run() {
 	})
 
 	log.Println("server started successfull")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(cfg.Address, r))
 }
