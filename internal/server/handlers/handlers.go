@@ -41,7 +41,7 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if metric, found := h.metricsStorage.Get(metric.ID); found {
+	if metric, found := h.metricsStorage.Get(metric); found {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(metric)
@@ -68,7 +68,7 @@ func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 			}
 		case models.COUNTER:
 			if f, err := strconv.ParseInt(value, 10, 64); err == nil {
-				metric = models.Metrics{ID: name, MType: models.GAUGE, Delta: &f}
+				metric = models.Metrics{ID: name, MType: models.COUNTER, Delta: &f}
 			} else {
 				reqError = fmt.Errorf("wrong counter param: %v", value)
 			}
@@ -92,15 +92,15 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "name")
 	var found bool
 	var result string
-	var metric models.Metrics
+	var metric *models.Metrics
 	switch metricType {
 	case "gauge":
-		metric, found = h.metricsStorage.Get(metricName)
+		metric, found = h.metricsStorage.GetGauge(metricName)
 		if found {
 			result = fmt.Sprintf("%v", *metric.Value)
 		}
 	case "counter":
-		metric, found = h.metricsStorage.Get(metricName)
+		metric, found = h.metricsStorage.GetCounter(metricName)
 		if found {
 			result = fmt.Sprintf("%v", *metric.Delta)
 		}

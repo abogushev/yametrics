@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -14,20 +13,22 @@ import (
 )
 
 type MetricsStorage interface {
-	Get(string) (models.Metrics, bool)
+	Get(models.Metrics) (*models.Metrics, bool)
+	GetGauge(string) (*models.Metrics, bool)
+	GetCounter(string) (*models.Metrics, bool)
 	GetAll() []models.Metrics
 	Update(models.Metrics)
 }
 
 type MetricsStorageImpl struct {
 	mutex   sync.Mutex
-	metrics map[string]models.Metrics
+	metrics map[string]*models.Metrics
 	logger  *zap.SugaredLogger
 	cfg     *models.MetricsStorageConfig
 }
 
 func NewMetricsStorageImpl(cfg *models.MetricsStorageConfig, logger *zap.SugaredLogger, ctx context.Context) (MetricsStorage, error) {
-	storage := &MetricsStorageImpl{metrics: map[string]models.Metrics{}, cfg: cfg, logger: logger}
+	storage := &MetricsStorageImpl{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
 	if cfg.Restore {
 		if err := storage.loadMetrics(); err != nil {
 			return nil, err
@@ -39,17 +40,36 @@ func NewMetricsStorageImpl(cfg *models.MetricsStorageConfig, logger *zap.Sugared
 	return storage, nil
 }
 
-func (s *MetricsStorageImpl) Get(name string) (v models.Metrics, ok bool) {
-	v, ok = s.metrics[name]
-	fmt.Printf("get mtrc - key: %v, value: %v, delta: %v, all: %v\n", name, v.Value, v.Delta, s.metrics)
-	return
+func (s *MetricsStorageImpl) Get(m models.Metrics) (*models.Metrics, bool) {
+	if m.MType == models.COUNTER {
+		return s.GetCounter(m.ID)
+	} else if m.MType == models.GAUGE {
+		return s.GetGauge(m.ID)
+	} else {
+		return nil, false
+	}
+}
+
+func (s *MetricsStorageImpl) GetGauge(name string) (*models.Metrics, bool) {
+	if v, ok := s.metrics[name]; ok && v.MType == models.GAUGE {
+		return v, true
+	} else {
+		return nil, false
+	}
+}
+func (s *MetricsStorageImpl) GetCounter(name string) (*models.Metrics, bool) {
+	if v, ok := s.metrics[name]; ok && v.MType == models.COUNTER {
+		return v, true
+	} else {
+		return nil, false
+	}
 }
 
 func (s *MetricsStorageImpl) GetAll() []models.Metrics {
 	m := make([]models.Metrics, len(s.metrics))
 	i := 0
 	for _, v := range s.metrics {
-		m[i] = v
+		m[i] = *v
 		i++
 	}
 	return m
@@ -57,9 +77,13 @@ func (s *MetricsStorageImpl) GetAll() []models.Metrics {
 
 func (s *MetricsStorageImpl) Update(m models.Metrics) {
 	s.mutex.Lock()
-	s.metrics[m.ID] = m
-	fmt.Printf("update mtrcs - key: %v, value: %v, delta: %v, all: %v\n", m.ID, m.Value, m.Delta, s.metrics)
-	s.mutex.Unlock()
+	defer s.mutex.Unlock()
+
+	if c, ok := s.GetCounter(m.ID); ok {
+		*c.Delta += *m.Delta
+	} else {
+		s.metrics[m.ID] = &m
+	}
 }
 
 func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context) {
@@ -101,7 +125,7 @@ func (s *MetricsStorageImpl) loadMetrics() error {
 	} else {
 		defer file.Close()
 		decoder := json.NewDecoder(file)
-		metrics := make(map[string]models.Metrics, 0)
+		metrics := make(map[string]*models.Metrics, 0)
 		for {
 			var m models.Metrics
 			if err := decoder.Decode(&m); err == io.EOF {
@@ -112,7 +136,7 @@ func (s *MetricsStorageImpl) loadMetrics() error {
 				s.logger.Error("error on read from file", err)
 				return err
 			} else {
-				metrics[m.ID] = m
+				metrics[m.ID] = &m
 			}
 		}
 	}
