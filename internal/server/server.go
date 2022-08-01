@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"context"
 	"net/http"
 	"yametrics/internal/server/handlers"
 	"yametrics/internal/server/models"
@@ -12,8 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run(logger *zap.SugaredLogger, cfg models.ServerConfig) {
-	handler := handlers.NewHandler(logger, storage.NewMetricsStorageImpl())
+func Run(logger *zap.SugaredLogger, cfg models.ServerConfig, storage storage.MetricsStorage, ctx context.Context) {
+	handler := handlers.NewHandler(logger, storage)
 
 	r := chi.NewRouter()
 
@@ -37,6 +37,20 @@ func Run(logger *zap.SugaredLogger, cfg models.ServerConfig) {
 		r.Get("/", handler.GetAllAsHTML)
 	})
 
-	log.Println("server started successfull")
-	log.Fatal(http.ListenAndServe(cfg.Address, r))
+	server := &http.Server{Addr: cfg.Address, Handler: r}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatalf("server start error: %s\n", err)
+		}
+	}()
+	logger.Info("server started successfuly")
+
+	<-ctx.Done()
+	logger.Info("get stop signal, start shutdown server")
+	if err := server.Shutdown(ctx); err != nil && err != context.Canceled {
+		logger.Fatalf("Server Shutdown Failed:%+v", err)
+	} else {
+		logger.Info("server stopped successfully")
+	}
 }
