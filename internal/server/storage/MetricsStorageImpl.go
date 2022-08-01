@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -40,6 +41,7 @@ func NewMetricsStorageImpl(cfg *models.MetricsStorageConfig, logger *zap.Sugared
 
 func (s *MetricsStorageImpl) Get(name string) (v models.Metrics, ok bool) {
 	v, ok = s.metrics[name]
+	fmt.Printf("get mtrc - key: %v, value: %v, delta: %v, all: %v\n", name, v.Value, v.Delta, s.metrics)
 	return
 }
 
@@ -56,6 +58,7 @@ func (s *MetricsStorageImpl) GetAll() []models.Metrics {
 func (s *MetricsStorageImpl) Update(m models.Metrics) {
 	s.mutex.Lock()
 	s.metrics[m.ID] = m
+	fmt.Printf("update mtrcs - key: %v, value: %v, delta: %v, all: %v\n", m.ID, m.Value, m.Delta, s.metrics)
 	s.mutex.Unlock()
 }
 
