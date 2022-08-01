@@ -68,6 +68,7 @@ func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context) {
 
 		case <-ctx.Done():
 			ticker.Stop()
+			s.saveMetrics()
 			s.logger.Info("stop runSaveMetricsJob")
 			return
 		}
