@@ -21,6 +21,7 @@ func Run(logger *zap.SugaredLogger, cfg *config.ServerConfig, storage storage.Me
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Compress(5))
 
 	r.Route("/update", func(r chi.Router) {
 		r.Post("/{type:gauge|counter}/{name}/{value}", handler.UpdateV1)
