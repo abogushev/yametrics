@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"yametrics/internal/server/config"
 	"yametrics/internal/server/models"
 
 	"go.uber.org/zap"
@@ -24,11 +25,11 @@ type MetricsStorageImpl struct {
 	mutex   sync.Mutex
 	metrics map[string]*models.Metrics
 	logger  *zap.SugaredLogger
-	cfg     *models.MetricsStorageConfig
+	cfg     *config.MetricsStorageConfig
 }
 
 func NewMetricsStorageImpl(
-	cfg *models.MetricsStorageConfig,
+	cfg *config.MetricsStorageConfig,
 	logger *zap.SugaredLogger,
 	ctx context.Context,
 	wg *sync.WaitGroup) (MetricsStorage, error) {
@@ -92,6 +93,7 @@ func (s *MetricsStorageImpl) Update(m models.Metrics) {
 
 func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.WaitGroup) {
 	ticker := time.NewTicker(s.cfg.StoreInterval)
+	wg.Add(1)
 	defer wg.Done()
 	for {
 		select {

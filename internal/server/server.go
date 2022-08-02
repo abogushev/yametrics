@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 	"net/http"
+	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
-	"yametrics/internal/server/models"
 	"yametrics/internal/server/storage"
 
 	"github.com/go-chi/chi"
@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run(logger *zap.SugaredLogger, cfg models.ServerConfig, storage storage.MetricsStorage, ctx context.Context) {
+func Run(logger *zap.SugaredLogger, cfg *config.ServerConfig, storage storage.MetricsStorage, ctx context.Context) {
 	handler := handlers.NewHandler(logger, storage)
 
 	r := chi.NewRouter()
