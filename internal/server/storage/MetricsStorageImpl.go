@@ -27,7 +27,11 @@ type MetricsStorageImpl struct {
 	cfg     *models.MetricsStorageConfig
 }
 
-func NewMetricsStorageImpl(cfg *models.MetricsStorageConfig, logger *zap.SugaredLogger, ctx context.Context) (MetricsStorage, error) {
+func NewMetricsStorageImpl(
+	cfg *models.MetricsStorageConfig,
+	logger *zap.SugaredLogger,
+	ctx context.Context,
+	wg *sync.WaitGroup) (MetricsStorage, error) {
 	storage := &MetricsStorageImpl{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
 	if cfg.Restore {
 		if err := storage.loadMetrics(); err != nil {
@@ -35,7 +39,7 @@ func NewMetricsStorageImpl(cfg *models.MetricsStorageConfig, logger *zap.Sugared
 		}
 	}
 	if cfg.StoreFile != "" {
-		go storage.runSaveMetricsJob(ctx)
+		go storage.runSaveMetricsJob(ctx, wg)
 	}
 	return storage, nil
 }
@@ -86,8 +90,9 @@ func (s *MetricsStorageImpl) Update(m models.Metrics) {
 	}
 }
 
-func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context) {
+func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.WaitGroup) {
 	ticker := time.NewTicker(s.cfg.StoreInterval)
+	defer wg.Done()
 	for {
 		select {
 		case <-ticker.C:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os/signal"
+	"sync"
 	"syscall"
 	"yametrics/internal/server"
 	"yametrics/internal/server/models"
@@ -34,10 +35,14 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+
 	var metricsStorage storage.MetricsStorage
-	if metricsStorage, err = storage.NewMetricsStorageImpl(&storageCfg, logger, ctx); err != nil {
+	if metricsStorage, err = storage.NewMetricsStorageImpl(&storageCfg, logger, ctx, wg); err != nil {
 		logger.Fatal("error on create metric storage", err)
 	}
 
 	server.Run(logger, serverCfg, metricsStorage, ctx)
+	wg.Wait()
 }
