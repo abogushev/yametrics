@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"time"
 
-	"yametrics/internal/agent/models"
+	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ type Agent struct {
 	pollInterval   time.Duration
 }
 
-func NewAgent(l *zap.SugaredLogger, config models.AgentConfig) *Agent {
+func NewAgent(l *zap.SugaredLogger, config *config.AgentConfig) *Agent {
 
 	return &Agent{
 		url:            "http://" + config.Address,

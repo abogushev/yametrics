@@ -5,9 +5,8 @@ import (
 	"os/signal"
 	"syscall"
 	"yametrics/internal/agent"
-	"yametrics/internal/agent/models"
+	"yametrics/internal/agent/config"
 
-	"github.com/caarlos0/env/v6"
 	"go.uber.org/zap"
 )
 
@@ -16,14 +15,10 @@ func main() {
 	logger := l.Sugar()
 	defer logger.Sync()
 
-	var cfg models.AgentConfig
-	err := env.Parse(&cfg)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	configProvider := config.NewConfigProvider()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 
-	agent.NewAgent(logger, cfg).RunSync(ctx)
+	agent.NewAgent(logger, configProvider.AgentCfg).RunSync(ctx)
 }
