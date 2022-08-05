@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
+	"yametrics/internal/server/models"
 	"yametrics/internal/server/storage"
 
 	"github.com/go-chi/chi"
@@ -12,62 +15,97 @@ import (
 )
 
 type Handler struct {
-	GuageStorage   storage.GuageStorage
-	CounterStorage storage.CounterStorage
-	Logger         *zap.SugaredLogger
+	logger         *zap.SugaredLogger
+	metricsStorage storage.MetricsStorage
 }
 
-func (h *Handler) PostGuage(w http.ResponseWriter, r *http.Request) {
+func NewHandler(logger *zap.SugaredLogger, metricsStorage storage.MetricsStorage) Handler {
+	return Handler{logger: logger, metricsStorage: metricsStorage}
+}
 
+func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
+	var metric models.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	h.metricsStorage.Update(metric)
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
+	var metric models.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if metric, found := h.metricsStorage.Get(metric); found {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(metric)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
+	mtype := chi.URLParam(r, "type")
 
-	if v, err := strconv.ParseFloat(value, 64); err == nil && name != "" {
-		h.GuageStorage.Update(name, v)
+	var reqError error
+	var metric models.Metrics
+
+	if name != "" {
+		switch mtype {
+		case models.GAUGE:
+			if f, err := strconv.ParseFloat(value, 64); err == nil {
+				metric = models.Metrics{ID: name, MType: models.GAUGE, Value: &f}
+			} else {
+				reqError = fmt.Errorf("wrong gauge param: %v", value)
+			}
+		case models.COUNTER:
+			if f, err := strconv.ParseInt(value, 10, 64); err == nil {
+				metric = models.Metrics{ID: name, MType: models.COUNTER, Delta: &f}
+			} else {
+				reqError = fmt.Errorf("wrong counter param: %v", value)
+			}
+		}
+	} else {
+		reqError = errors.New("param `name` must be nonempty")
+	}
+
+	if reqError == nil {
+		h.metricsStorage.Update(metric)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 	} else {
-		h.Logger.Errorf("wrong params: name=%v, value=%v", name, value)
+		h.logger.Error(reqError)
 		w.WriteHeader(http.StatusBadRequest)
 	}
 }
 
-func (h *Handler) PostCounter(w http.ResponseWriter, r *http.Request) {
-
-	name := chi.URLParam(r, "name")
-	value := chi.URLParam(r, "value")
-	if v, error := strconv.ParseInt(value, 10, 64); error == nil && name != "" {
-		h.CounterStorage.Update(name, v)
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-	} else {
-		h.Logger.Errorf("wrong params: name=%v, value=%v", name, value)
-		w.WriteHeader(http.StatusBadRequest)
-	}
-
-}
-
-func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 	var found bool
 	var result string
-
+	var metric *models.Metrics
 	switch metricType {
 	case "gauge":
-		var v float64
-		v, found = h.GuageStorage.Get(metricName)
+		metric, found = h.metricsStorage.GetGauge(metricName)
 		if found {
-			result = fmt.Sprintf("%v", v)
+			result = fmt.Sprintf("%v", *metric.Value)
 		}
 	case "counter":
-		var v int64
-		v, found = h.CounterStorage.Get(metricName)
+		metric, found = h.metricsStorage.GetCounter(metricName)
 		if found {
-			result = fmt.Sprintf("%v", v)
+			result = fmt.Sprintf("%v", *metric.Delta)
 		}
 	default:
-		h.Logger.Errorf("wrong metric type: %v", metricType)
+		h.logger.Errorf("wrong metric type: %v", metricType)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -83,12 +121,16 @@ func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
-	allmtrcs := []string{}
-	for n, v := range h.GuageStorage.GetAll() {
-		allmtrcs = append(allmtrcs, fmt.Sprintf("name: %v value: %v", n, v))
-	}
-	for n, v := range h.CounterStorage.GetAll() {
-		allmtrcs = append(allmtrcs, fmt.Sprintf("name: %v value: %v", n, v))
+	storageMetrics := h.metricsStorage.GetAll()
+	allmtrcs := make([]string, len(storageMetrics))
+
+	for v, i := "", 0; i < len(storageMetrics); i++ {
+		if storageMetrics[i].MType == models.GAUGE {
+			v = fmt.Sprintf("%v", *storageMetrics[i].Value)
+		} else {
+			v = fmt.Sprintf("%v", *storageMetrics[i].Delta)
+		}
+		allmtrcs[i] = fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v)
 	}
 
 	tmpl, err := template.New("test").Parse(`
@@ -104,13 +146,13 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 		</html>`)
 
 	if err != nil {
-		h.Logger.Error("Error Parsing template: ", err)
+		h.logger.Error("Error Parsing template: ", err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	err1 := tmpl.Execute(w, allmtrcs)
 	if err1 != nil {
-		h.Logger.Error("Error executing template: ", err1)
+		h.logger.Error("Error executing template: ", err1)
 	}
 }

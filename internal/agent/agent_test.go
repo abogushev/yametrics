@@ -1,63 +1,93 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"testing"
+	"yametrics/internal/agent/models/api"
+	"yametrics/internal/agent/models/storage"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
-func Test_mkURL(t *testing.T) {
-	m := &Metrics{&runtime.MemStats{}, 1, 2.0}
-	url := "http://127.0.0.1:8080/update/gauge"
-	runtime.ReadMemStats(m.MemStats)
-	tests := []struct {
-		name string
-		m    *Metrics
-		want []string
-	}{
-		{
-			"correct urls",
-			m,
-			[]string{
-				fmt.Sprintf("%v/Alloc/%v", url, m.Alloc),
-				fmt.Sprintf("%v/BuckHashSys/%v", url, m.BuckHashSys),
-				fmt.Sprintf("%v/Frees/%v", url, m.Frees),
-				fmt.Sprintf("%v/GCCPUFraction/%v", url, m.GCCPUFraction),
-				fmt.Sprintf("%v/GCSys/%v", url, m.GCSys),
-				fmt.Sprintf("%v/HeapAlloc/%v", url, m.HeapAlloc),
-				fmt.Sprintf("%v/HeapIdle/%v", url, m.HeapIdle),
-				fmt.Sprintf("%v/HeapInuse/%v", url, m.HeapInuse),
-				fmt.Sprintf("%v/HeapObjects/%v", url, m.HeapObjects),
-				fmt.Sprintf("%v/HeapReleased/%v", url, m.HeapReleased),
-				fmt.Sprintf("%v/HeapSys/%v", url, m.HeapSys),
-				fmt.Sprintf("%v/LastGC/%v", url, m.LastGC),
-				fmt.Sprintf("%v/Lookups/%v", url, m.Lookups),
-				fmt.Sprintf("%v/MCacheInuse/%v", url, m.MCacheInuse),
-				fmt.Sprintf("%v/MCacheSys/%v", url, m.MCacheSys),
-				fmt.Sprintf("%v/MSpanInuse/%v", url, m.MSpanInuse),
-				fmt.Sprintf("%v/MSpanSys/%v", url, m.MSpanSys),
-				fmt.Sprintf("%v/Mallocs/%v", url, m.Mallocs),
-				fmt.Sprintf("%v/NextGC/%v", url, m.NextGC),
-				fmt.Sprintf("%v/NumForcedGC/%v", url, m.NumForcedGC),
-				fmt.Sprintf("%v/NumGC/%v", url, m.NumGC),
-				fmt.Sprintf("%v/OtherSys/%v", url, m.OtherSys),
-				fmt.Sprintf("%v/PauseTotalNs/%v", url, m.PauseTotalNs),
-				fmt.Sprintf("%v/StackInuse/%v", url, m.StackInuse),
-				fmt.Sprintf("%v/StackSys/%v", url, m.StackSys),
-				fmt.Sprintf("%v/Sys/%v", url, m.Sys),
-				fmt.Sprintf("%v/TotalAlloc/%v", url, m.TotalAlloc),
-				fmt.Sprintf("%v/RandomValue/%v", url, m.RandomValue),
-				fmt.Sprintf("http://127.0.0.1:8080/update/counter/PollCount/%v", m.PollCount),
-			},
-		},
+func TestAgent_sendMetricsV1(t *testing.T) {
+	urls := []string{
+		"/update/gauge/Alloc/0",
+		"/update/gauge/BuckHashSys/0",
+		"/update/gauge/Frees/0",
+		"/update/gauge/GCCPUFraction/0",
+		"/update/gauge/GCSys/0",
+		"/update/gauge/HeapAlloc/0",
+		"/update/gauge/HeapIdle/0",
+		"/update/gauge/HeapInuse/0",
+		"/update/gauge/HeapObjects/0",
+		"/update/gauge/HeapReleased/0",
+		"/update/gauge/HeapSys/0",
+		"/update/gauge/LastGC/0",
+		"/update/gauge/Lookups/0",
+		"/update/gauge/MCacheInuse/0",
+		"/update/gauge/MCacheSys/0",
+		"/update/gauge/MSpanInuse/0",
+		"/update/gauge/MSpanSys/0",
+		"/update/gauge/Mallocs/0",
+		"/update/gauge/NextGC/0",
+		"/update/gauge/NumForcedGC/0",
+		"/update/gauge/NumGC/0",
+		"/update/gauge/OtherSys/0",
+		"/update/gauge/PauseTotalNs/0",
+		"/update/gauge/StackInuse/0",
+		"/update/gauge/StackSys/0",
+		"/update/gauge/Sys/0",
+		"/update/gauge/TotalAlloc/0",
+		"/update/gauge/RandomValue/0",
+		"/update/counter/PollCount/0",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := mkURL(tt.m); !assert.ElementsMatch(t, got, tt.want) {
-				t.Errorf("mkURL() = %v, want %v", got, tt.want)
-			}
-		})
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Test request parameters
+		assert.Equal(t, req.Method, "POST")
+
+		assert.Contains(t, urls, req.URL.String())
+		// Send response to be tested
+		rw.Write([]byte(`OK`))
+	}))
+	defer server.Close()
+	logger, _ := zap.NewProduction()
+	fmt.Println(server.URL)
+	agent := &Agent{
+		url:     server.URL,
+		client:  *server.Client(),
+		logger:  logger.Sugar(),
+		metrics: &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
 	}
+	agent.sendMetricsV1()
+}
+
+func TestAgent_sendMetricsV2(t *testing.T) {
+	results := &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0}
+	apiModels := results.ToAPI()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Test request parameters
+		assert.Equal(t, req.Method, "POST")
+		var metric api.Metrics
+		err := json.NewDecoder(req.Body).Decode(&metric)
+		if assert.NoError(t, err) {
+			assert.Contains(t, apiModels, metric)
+		}
+		// Send response to be tested
+		rw.Write([]byte(`OK`))
+	}))
+	defer server.Close()
+	logger, _ := zap.NewProduction()
+	agent := &Agent{
+		url:     server.URL,
+		client:  *server.Client(),
+		logger:  logger.Sugar(),
+		metrics: results,
+	}
+	agent.sendMetricsV2()
 }

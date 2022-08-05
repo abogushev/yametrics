@@ -5,17 +5,20 @@ import (
 	"os/signal"
 	"syscall"
 	"yametrics/internal/agent"
+	"yametrics/internal/agent/config"
 
 	"go.uber.org/zap"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	l, _ := zap.NewProduction()
-	defer l.Sync() // flushes buffer, if any
+	logger := l.Sugar()
+	defer logger.Sync()
+
+	configProvider := config.NewConfigProvider()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 
-	agent.Run(ctx, l.Sugar())
-
-	<-ctx.Done()
+	agent.NewAgent(logger, configProvider.AgentCfg).RunSync(ctx)
 }

@@ -1,8 +1,9 @@
 package server
 
 import (
-	"log"
+	"context"
 	"net/http"
+	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
 	"yametrics/internal/server/storage"
 
@@ -11,10 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run() {
-	l, _ := zap.NewProduction()
-	defer l.Sync() // flushes buffer, if any
-	handler := &handlers.Handler{GuageStorage: storage.NewGuageStorage(), CounterStorage: storage.NewCounterStorage(), Logger: l.Sugar()}
+func Run(logger *zap.SugaredLogger, cfg *config.ServerConfig, storage storage.MetricsStorage, ctx context.Context) {
+	handler := handlers.NewHandler(logger, storage)
 
 	r := chi.NewRouter()
 
@@ -22,23 +21,37 @@ func Run() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Compress(5))
 
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/gauge/{name}/{value}", handler.PostGuage)
-		r.Post("/counter/{name}/{value}", handler.PostCounter)
-		r.Post("/gauge/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
-		r.Post("/counter/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
-		r.Post("/*", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
+		r.Post("/{type:gauge|counter}/{name}/{value}", handler.UpdateV1)
+		r.Post("/{type}/{name}/{value}", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotImplemented) })
+		r.Post("/", handler.UpdateV2)
 	})
 
 	r.Route("/value", func(r chi.Router) {
-		r.Get("/{type}/{name}", handler.GetMetric)
+		r.Get("/{type}/{name}", handler.GetV1)
+		r.Post("/", handler.GetV2)
 	})
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", handler.GetAllAsHTML)
 	})
 
-	log.Println("server started successfull")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	server := &http.Server{Addr: cfg.Address, Handler: r}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatalf("server start error: %s\n", err)
+		}
+	}()
+	logger.Info("server started successfuly")
+
+	<-ctx.Done()
+	logger.Info("get stop signal, start shutdown server")
+	if err := server.Shutdown(ctx); err != nil && err != context.Canceled {
+		logger.Fatalf("Server Shutdown Failed:%+v", err)
+	} else {
+		logger.Info("server stopped successfully")
+	}
 }
