@@ -21,7 +21,7 @@ type MetricsStorage interface {
 	Update(models.Metrics)
 }
 
-type MetricsStorageImpl struct {
+type metricsStorageImpl struct {
 	mutex   sync.Mutex
 	metrics map[string]*models.Metrics
 	logger  *zap.SugaredLogger
@@ -33,7 +33,7 @@ func NewMetricsStorageImpl(
 	logger *zap.SugaredLogger,
 	ctx context.Context,
 	wg *sync.WaitGroup) (MetricsStorage, error) {
-	storage := &MetricsStorageImpl{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
+	storage := &metricsStorageImpl{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
 	if cfg.Restore {
 		if err := storage.loadMetrics(); err != nil {
 			return nil, err
@@ -45,7 +45,7 @@ func NewMetricsStorageImpl(
 	return storage, nil
 }
 
-func (s *MetricsStorageImpl) Get(m models.Metrics) (*models.Metrics, bool) {
+func (s *metricsStorageImpl) Get(m models.Metrics) (*models.Metrics, bool) {
 	if m.MType == models.COUNTER {
 		return s.GetCounter(m.ID)
 	} else if m.MType == models.GAUGE {
@@ -55,14 +55,14 @@ func (s *MetricsStorageImpl) Get(m models.Metrics) (*models.Metrics, bool) {
 	}
 }
 
-func (s *MetricsStorageImpl) GetGauge(name string) (*models.Metrics, bool) {
+func (s *metricsStorageImpl) GetGauge(name string) (*models.Metrics, bool) {
 	if v, ok := s.metrics[name]; ok && v.MType == models.GAUGE {
 		return v, true
 	} else {
 		return nil, false
 	}
 }
-func (s *MetricsStorageImpl) GetCounter(name string) (*models.Metrics, bool) {
+func (s *metricsStorageImpl) GetCounter(name string) (*models.Metrics, bool) {
 	if v, ok := s.metrics[name]; ok && v.MType == models.COUNTER {
 		return v, true
 	} else {
@@ -70,7 +70,7 @@ func (s *MetricsStorageImpl) GetCounter(name string) (*models.Metrics, bool) {
 	}
 }
 
-func (s *MetricsStorageImpl) GetAll() []models.Metrics {
+func (s *metricsStorageImpl) GetAll() []models.Metrics {
 	m := make([]models.Metrics, len(s.metrics))
 	i := 0
 	for _, v := range s.metrics {
@@ -80,7 +80,7 @@ func (s *MetricsStorageImpl) GetAll() []models.Metrics {
 	return m
 }
 
-func (s *MetricsStorageImpl) Update(m models.Metrics) {
+func (s *metricsStorageImpl) Update(m models.Metrics) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -91,7 +91,7 @@ func (s *MetricsStorageImpl) Update(m models.Metrics) {
 	}
 }
 
-func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.WaitGroup) {
+func (s *metricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.WaitGroup) {
 	ticker := time.NewTicker(s.cfg.StoreInterval)
 	wg.Add(1)
 	defer wg.Done()
@@ -109,7 +109,7 @@ func (s *MetricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.Wai
 	}
 }
 
-func (s *MetricsStorageImpl) saveMetrics() {
+func (s *metricsStorageImpl) saveMetrics() {
 	s.logger.Info("starting save metrics...")
 	if file, err := os.OpenFile(s.cfg.StoreFile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0777); err != nil {
 		s.logger.Error("error on save metrics", err)
@@ -124,7 +124,7 @@ func (s *MetricsStorageImpl) saveMetrics() {
 	}
 }
 
-func (s *MetricsStorageImpl) loadMetrics() error {
+func (s *metricsStorageImpl) loadMetrics() error {
 	s.logger.Info("starting load metrics...")
 	if file, err := os.OpenFile(s.cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0777); err != nil {
 		s.logger.Error("error on load metrics", err)
