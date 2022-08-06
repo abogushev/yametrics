@@ -13,7 +13,7 @@ import (
 )
 
 func Run(logger *zap.SugaredLogger, cfg *config.ServerConfig, storage storage.MetricsStorage, ctx context.Context) {
-	handler := handlers.NewHandler(logger, storage)
+	handler := handlers.NewHandler(logger, storage, cfg.SignKey)
 
 	r := chi.NewRouter()
 

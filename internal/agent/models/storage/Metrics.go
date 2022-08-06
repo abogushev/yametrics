@@ -2,6 +2,7 @@ package storage
 
 import (
 	"runtime"
+	"yametrics/internal/metricscrypto"
 	"yametrics/internal/protocol"
 )
 
@@ -21,6 +22,14 @@ func (m *Metrics) ToAPI() []protocol.Metrics {
 			result = append(result, protocol.Metrics{ID: s, MType: protocol.COUNTER, Delta: &i})
 		},
 	)
+	return result
+}
+
+func (m *Metrics) ToAPIWithSign(key string) []protocol.Metrics {
+	result := m.ToAPI()
+	for i := 0; i < len(result); i++ {
+		result[i].Hash = metricscrypto.GetMetricSign(result[i], key)
+	}
 	return result
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"yametrics/internal/metricscrypto"
 	"yametrics/internal/protocol"
 	"yametrics/internal/server/models"
 	"yametrics/internal/server/storage"
@@ -19,10 +20,11 @@ import (
 type Handler struct {
 	logger         *zap.SugaredLogger
 	metricsStorage storage.MetricsStorage
+	signKey        string
 }
 
-func NewHandler(logger *zap.SugaredLogger, metricsStorage storage.MetricsStorage) Handler {
-	return Handler{logger: logger, metricsStorage: metricsStorage}
+func NewHandler(logger *zap.SugaredLogger, metricsStorage storage.MetricsStorage, signKey string) Handler {
+	return Handler{logger: logger, metricsStorage: metricsStorage, signKey: signKey}
 }
 
 func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
@@ -31,9 +33,19 @@ func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	h.metricsStorage.Update(models.Metrics{ID: metric.ID, MType: metric.MType, Delta: *metric.Delta, Value: *metric.Value})
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
+	if h.signKey == "" || metricscrypto.GetMetricSign(metric, h.signKey) == metric.Hash {
+		var modelMetric models.Metrics
+		if metric.MType == protocol.GAUGE {
+			modelMetric.Value = *metric.Value
+		} else {
+			modelMetric.Delta = *metric.Delta
+		}
+		h.metricsStorage.Update(modelMetric)
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Error(w, "bad sign", http.StatusBadRequest)
+	}
 }
 
 func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
@@ -44,9 +56,16 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if metric, found := h.metricsStorage.Get(metric.ID, metric.MType); found {
+		protocolMetric := protocol.Metrics{ID: metric.ID, MType: metric.MType}
+		if metric.MType == models.GAUGE {
+			protocolMetric.Value = &metric.Value
+		} else {
+			protocolMetric.Delta = &metric.Delta
+		}
+		protocolMetric.Hash = metricscrypto.GetMetricSign(protocolMetric, h.signKey)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(metric)
+		json.NewEncoder(w).Encode(protocolMetric)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 	}
