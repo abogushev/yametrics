@@ -10,9 +10,9 @@ import (
 func GetMetricSign(m protocol.Metrics, key string) string {
 	switch m.MType {
 	case protocol.COUNTER:
-		return getSign(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), key)
+		return getSign(fmt.Sprintf("%s:%s:%d", m.ID, m.MType, *m.Delta), key)
 	case protocol.GAUGE:
-		return getSign(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), key)
+		return getSign(fmt.Sprintf("%s:%s:%f", m.ID, m.MType, *m.Value), key)
 	default:
 		return ""
 	}
