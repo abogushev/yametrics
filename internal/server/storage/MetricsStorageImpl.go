@@ -14,9 +14,7 @@ import (
 )
 
 type MetricsStorage interface {
-	Get(models.Metrics) (*models.Metrics, bool)
-	GetGauge(string) (*models.Metrics, bool)
-	GetCounter(string) (*models.Metrics, bool)
+	Get(id string, mtype string) (models.Metrics, bool)
 	GetAll() []models.Metrics
 	Update(models.Metrics)
 }
@@ -45,28 +43,11 @@ func NewMetricsStorageImpl(
 	return storage, nil
 }
 
-func (s *metricsStorageImpl) Get(m models.Metrics) (*models.Metrics, bool) {
-	if m.MType == models.COUNTER {
-		return s.GetCounter(m.ID)
-	} else if m.MType == models.GAUGE {
-		return s.GetGauge(m.ID)
+func (s *metricsStorageImpl) Get(id string, mtype string) (models.Metrics, bool) {
+	if v, ok := s.metrics[id]; ok && v.MType == mtype {
+		return *v, true
 	} else {
-		return nil, false
-	}
-}
-
-func (s *metricsStorageImpl) GetGauge(name string) (*models.Metrics, bool) {
-	if v, ok := s.metrics[name]; ok && v.MType == models.GAUGE {
-		return v, true
-	} else {
-		return nil, false
-	}
-}
-func (s *metricsStorageImpl) GetCounter(name string) (*models.Metrics, bool) {
-	if v, ok := s.metrics[name]; ok && v.MType == models.COUNTER {
-		return v, true
-	} else {
-		return nil, false
+		return models.Metrics{}, false
 	}
 }
 
@@ -84,8 +65,8 @@ func (s *metricsStorageImpl) Update(m models.Metrics) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if c, ok := s.GetCounter(m.ID); ok {
-		*c.Delta += *m.Delta
+	if v, ok := s.metrics[m.ID]; ok && v.MType == models.COUNTER {
+		v.Delta += m.Delta
 	} else {
 		s.metrics[m.ID] = &m
 	}
@@ -95,6 +76,7 @@ func (s *metricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.Wai
 	ticker := time.NewTicker(s.cfg.StoreInterval)
 	wg.Add(1)
 	defer wg.Done()
+
 	for {
 		select {
 		case <-ticker.C:

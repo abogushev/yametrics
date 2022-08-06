@@ -7,6 +7,8 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+
+	"yametrics/internal/protocol"
 	"yametrics/internal/server/models"
 	"yametrics/internal/server/storage"
 
@@ -24,24 +26,24 @@ func NewHandler(logger *zap.SugaredLogger, metricsStorage storage.MetricsStorage
 }
 
 func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
-	var metric models.Metrics
+	var metric protocol.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	h.metricsStorage.Update(metric)
+	h.metricsStorage.Update(models.Metrics{ID: metric.ID, MType: metric.MType, Delta: *metric.Delta, Value: *metric.Value})
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
-	var metric models.Metrics
+	var metric protocol.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if metric, found := h.metricsStorage.Get(metric); found {
+	if metric, found := h.metricsStorage.Get(metric.ID, metric.MType); found {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(metric)
@@ -60,15 +62,15 @@ func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 
 	if name != "" {
 		switch mtype {
-		case models.GAUGE:
+		case protocol.GAUGE:
 			if f, err := strconv.ParseFloat(value, 64); err == nil {
-				metric = models.Metrics{ID: name, MType: models.GAUGE, Value: &f}
+				metric = models.Metrics{ID: name, MType: protocol.GAUGE, Value: f}
 			} else {
 				reqError = fmt.Errorf("wrong gauge param: %v", value)
 			}
-		case models.COUNTER:
+		case protocol.COUNTER:
 			if f, err := strconv.ParseInt(value, 10, 64); err == nil {
-				metric = models.Metrics{ID: name, MType: models.COUNTER, Delta: &f}
+				metric = models.Metrics{ID: name, MType: protocol.COUNTER, Delta: f}
 			} else {
 				reqError = fmt.Errorf("wrong counter param: %v", value)
 			}
@@ -90,34 +92,23 @@ func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
-	var found bool
-	var result string
-	var metric *models.Metrics
-	switch metricType {
-	case "gauge":
-		metric, found = h.metricsStorage.GetGauge(metricName)
-		if found {
-			result = fmt.Sprintf("%v", *metric.Value)
-		}
-	case "counter":
-		metric, found = h.metricsStorage.GetCounter(metricName)
-		if found {
-			result = fmt.Sprintf("%v", *metric.Delta)
-		}
-	default:
+
+	if metricType != models.COUNTER && metricType != models.GAUGE {
 		h.logger.Errorf("wrong metric type: %v", metricType)
 		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if found {
+	} else if metric, ok := h.metricsStorage.Get(metricName, metricType); !ok {
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		var result string
+		if metric.MType == models.GAUGE {
+			result = fmt.Sprintf("%v", metric.Value)
+		} else {
+			result = fmt.Sprintf("%v", metric.Delta)
+		}
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(result))
-	} else {
-		w.WriteHeader(http.StatusNotFound)
 	}
-
 }
 
 func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
@@ -125,10 +116,10 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	allmtrcs := make([]string, len(storageMetrics))
 
 	for v, i := "", 0; i < len(storageMetrics); i++ {
-		if storageMetrics[i].MType == models.GAUGE {
-			v = fmt.Sprintf("%v", *storageMetrics[i].Value)
+		if storageMetrics[i].MType == protocol.GAUGE {
+			v = fmt.Sprintf("%v", storageMetrics[i].Value)
 		} else {
-			v = fmt.Sprintf("%v", *storageMetrics[i].Delta)
+			v = fmt.Sprintf("%v", storageMetrics[i].Delta)
 		}
 		allmtrcs[i] = fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v)
 	}
