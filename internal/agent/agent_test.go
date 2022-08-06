@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"runtime"
 	"testing"
+	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 	"yametrics/internal/protocol"
 
@@ -88,6 +89,7 @@ func TestAgent_sendMetricsV2(t *testing.T) {
 		client:  *server.Client(),
 		logger:  logger.Sugar(),
 		metrics: results,
+		config:  &config.AgentConfig{},
 	}
 	agent.sendMetricsV2()
 }

@@ -42,7 +42,7 @@ func (s *MockMetricStorage) Update(m models.Metrics) {}
 func TestGetV2(t *testing.T) {
 	metricStorage := new(MockMetricStorage)
 	storedMetric := models.Metrics{ID: "1", MType: "gauge", Value: 1}
-	handler := &Handler{getLogger(), metricStorage}
+	handler := &Handler{getLogger(), metricStorage, ""}
 	tests := []struct {
 		name     string
 		code     int
@@ -90,7 +90,7 @@ func TestGetV2(t *testing.T) {
 
 func TestUpdateV2(t *testing.T) {
 
-	handler := &Handler{getLogger(), new(MockMetricStorage)}
+	handler := &Handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
 		code int
@@ -127,7 +127,7 @@ func TestUpdateV2(t *testing.T) {
 }
 
 func TestUpdateV1(t *testing.T) {
-	handler := &Handler{getLogger(), new(MockMetricStorage)}
+	handler := &Handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
 		code int
@@ -282,7 +282,7 @@ func TestGetV1(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, tt.rctx))
 			w := httptest.NewRecorder()
-			handler := &Handler{getLogger(), tt.metricStorage}
+			handler := &Handler{getLogger(), tt.metricStorage, ""}
 			h := http.HandlerFunc(handler.GetV1)
 			h.ServeHTTP(w, request)
 			res := w.Result()
