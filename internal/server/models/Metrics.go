@@ -8,6 +8,6 @@ const (
 type Metrics struct {
 	ID    string
 	MType string
-	Delta int64
-	Value float64
+	Delta *int64
+	Value *float64
 }

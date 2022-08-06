@@ -14,7 +14,7 @@ import (
 )
 
 type MetricsStorage interface {
-	Get(id string, mtype string) (models.Metrics, bool)
+	Get(id string, mtype string) *models.Metrics
 	GetAll() []models.Metrics
 	Update(models.Metrics)
 }
@@ -43,11 +43,12 @@ func NewMetricsStorageImpl(
 	return storage, nil
 }
 
-func (s *metricsStorageImpl) Get(id string, mtype string) (models.Metrics, bool) {
-	if v, ok := s.metrics[id]; ok && v.MType == mtype {
-		return *v, true
+func (s *metricsStorageImpl) Get(id string, mtype string) *models.Metrics {
+	if metric, ok := s.metrics[id]; ok && metric.MType == mtype {
+		v := *metric
+		return &v
 	} else {
-		return models.Metrics{}, false
+		return nil
 	}
 }
 
@@ -66,7 +67,7 @@ func (s *metricsStorageImpl) Update(m models.Metrics) {
 	defer s.mutex.Unlock()
 
 	if v, ok := s.metrics[m.ID]; ok && v.MType == models.COUNTER {
-		v.Delta += m.Delta
+		*v.Delta += *m.Delta
 	} else {
 		s.metrics[m.ID] = &m
 	}

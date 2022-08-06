@@ -27,9 +27,13 @@ func getLogger() *zap.SugaredLogger {
 	return l.Sugar()
 }
 
-func (s *MockMetricStorage) Get(id string, mtype string) (models.Metrics, bool) {
+func (s *MockMetricStorage) Get(id string, mtype string) *models.Metrics {
 	rs := s.Called(id, mtype)
-	return rs.Get(0).(models.Metrics), rs.Bool(1)
+	if result := rs.Get(0); result != nil {
+		return result.(*models.Metrics)
+	} else {
+		return nil
+	}
 }
 
 func (s *MockMetricStorage) GetAll() []models.Metrics {
@@ -41,13 +45,12 @@ func (s *MockMetricStorage) Update(m models.Metrics) {}
 
 func TestGetV2(t *testing.T) {
 	metricStorage := new(MockMetricStorage)
-	storedMetric := models.Metrics{ID: "1", MType: "gauge", Value: 1}
 	handler := &Handler{getLogger(), metricStorage, ""}
 	tests := []struct {
 		name     string
 		code     int
 		body     []byte
-		response *models.Metrics
+		response *protocol.Metrics
 	}{
 		{
 			"200",
@@ -55,10 +58,14 @@ func TestGetV2(t *testing.T) {
 			func() []byte {
 				r := protocol.Metrics{ID: "1", MType: "gauge"}
 				json, _ := json.Marshal(r)
-				metricStorage.On("Get", "1", "gauge").Return(storedMetric, true)
+				v := 1.0
+				metricStorage.On("Get", "1", "gauge").Return(&models.Metrics{ID: "1", MType: "gauge", Value: &v}, true)
 				return json
 			}(),
-			&storedMetric,
+			func() *protocol.Metrics {
+				v := 1.0
+				return &protocol.Metrics{ID: "1", MType: "gauge", Value: &v}
+			}(),
 		},
 		{
 			"400",
@@ -77,11 +84,11 @@ func TestGetV2(t *testing.T) {
 			h := http.HandlerFunc(handler.GetV2)
 			h.ServeHTTP(w, request)
 			res := w.Result()
-			var result models.Metrics
-			res.Body.Close()
+			var result protocol.Metrics
+			defer res.Body.Close()
 			if tt.response != nil {
 				json.NewDecoder(res.Body).Decode(&result)
-				assert.Equal(t, true, assert.ObjectsAreEqualValues(result, storedMetric), "wrong response")
+				assert.Equal(t, true, assert.ObjectsAreEqualValues(result, *tt.response), "wrong response")
 			}
 			assert.Equal(t, tt.code, res.StatusCode, "wrong status")
 		})
@@ -89,7 +96,7 @@ func TestGetV2(t *testing.T) {
 }
 
 func TestUpdateV2(t *testing.T) {
-
+	v := 1.0
 	handler := &Handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
@@ -100,7 +107,7 @@ func TestUpdateV2(t *testing.T) {
 			"200",
 			200,
 			func() []byte {
-				json, _ := json.Marshal(&models.Metrics{ID: "1", MType: "gauge", Value: 1})
+				json, _ := json.Marshal(&models.Metrics{ID: "1", MType: "gauge", Value: &v})
 				return json
 			}(),
 		},
@@ -197,7 +204,6 @@ func TestUpdateV1(t *testing.T) {
 func TestGetV1(t *testing.T) {
 	existMetricName := "existMetricName"
 	ubsentMetricName := "ubsentMetricName"
-	model := models.Metrics{ID: "1", MType: models.GAUGE, Value: 1, Delta: 1}
 	tests := []struct {
 		name          string
 		metricStorage storage.MetricsStorage
@@ -209,7 +215,9 @@ func TestGetV1(t *testing.T) {
 			"guage, 200 OK",
 			func() storage.MetricsStorage {
 				r := new(MockMetricStorage)
-				r.On("Get", existMetricName, models.GAUGE).Return(model, true)
+				v := 1.0
+				model := models.Metrics{ID: "1", MType: models.GAUGE, Value: &v}
+				r.On("Get", existMetricName, models.GAUGE).Return(&model, true)
 				return r
 			}(),
 			200,
@@ -225,7 +233,7 @@ func TestGetV1(t *testing.T) {
 			"guage, 404 Not Found",
 			func() storage.MetricsStorage {
 				r := new(MockMetricStorage)
-				r.On("Get", ubsentMetricName, models.GAUGE).Return(model, false)
+				r.On("Get", ubsentMetricName, models.GAUGE).Return(nil, false)
 				return r
 			}(),
 			404,
@@ -248,7 +256,9 @@ func TestGetV1(t *testing.T) {
 			"counter, 200 OK",
 			func() storage.MetricsStorage {
 				r := new(MockMetricStorage)
-				r.On("Get", existMetricName, models.COUNTER).Return(model, true)
+				var d int64 = 1
+				model := models.Metrics{ID: "1", MType: models.COUNTER, Delta: &d}
+				r.On("Get", existMetricName, models.COUNTER).Return(&model, true)
 				return r
 			}(),
 			200,
@@ -264,7 +274,7 @@ func TestGetV1(t *testing.T) {
 			"counter, 404 Not Found",
 			func() storage.MetricsStorage {
 				r := new(MockMetricStorage)
-				r.On("Get", ubsentMetricName, models.COUNTER).Return(model, false)
+				r.On("Get", ubsentMetricName, models.COUNTER).Return(nil, false)
 				return r
 			}(),
 			404,

@@ -34,13 +34,7 @@ func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.signKey == "" || metricscrypto.GetMetricSign(metric, h.signKey) == metric.Hash {
-		var modelMetric models.Metrics
-		if metric.MType == protocol.GAUGE {
-			modelMetric.Value = *metric.Value
-		} else {
-			modelMetric.Delta = *metric.Delta
-		}
-		h.metricsStorage.Update(modelMetric)
+		h.metricsStorage.Update(models.Metrics{ID: metric.ID, MType: metric.MType, Delta: metric.Delta, Value: metric.Value})
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -55,14 +49,11 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if metric, found := h.metricsStorage.Get(metric.ID, metric.MType); found {
-		protocolMetric := protocol.Metrics{ID: metric.ID, MType: metric.MType}
-		if metric.MType == models.GAUGE {
-			protocolMetric.Value = &metric.Value
-		} else {
-			protocolMetric.Delta = &metric.Delta
+	if metric := h.metricsStorage.Get(metric.ID, metric.MType); metric != nil {
+		protocolMetric := protocol.Metrics{ID: metric.ID, MType: metric.MType, Value: metric.Value, Delta: metric.Delta}
+		if h.signKey != "" {
+			protocolMetric.Hash = metricscrypto.GetMetricSign(protocolMetric, h.signKey)
 		}
-		protocolMetric.Hash = metricscrypto.GetMetricSign(protocolMetric, h.signKey)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(protocolMetric)
@@ -83,13 +74,13 @@ func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 		switch mtype {
 		case protocol.GAUGE:
 			if f, err := strconv.ParseFloat(value, 64); err == nil {
-				metric = models.Metrics{ID: name, MType: protocol.GAUGE, Value: f}
+				metric = models.Metrics{ID: name, MType: protocol.GAUGE, Value: &f}
 			} else {
 				reqError = fmt.Errorf("wrong gauge param: %v", value)
 			}
 		case protocol.COUNTER:
 			if f, err := strconv.ParseInt(value, 10, 64); err == nil {
-				metric = models.Metrics{ID: name, MType: protocol.COUNTER, Delta: f}
+				metric = models.Metrics{ID: name, MType: protocol.COUNTER, Delta: &f}
 			} else {
 				reqError = fmt.Errorf("wrong counter param: %v", value)
 			}
@@ -115,14 +106,14 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	if metricType != models.COUNTER && metricType != models.GAUGE {
 		h.logger.Errorf("wrong metric type: %v", metricType)
 		w.WriteHeader(http.StatusBadRequest)
-	} else if metric, ok := h.metricsStorage.Get(metricName, metricType); !ok {
+	} else if metric := h.metricsStorage.Get(metricName, metricType); metric == nil {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
 		var result string
 		if metric.MType == models.GAUGE {
-			result = fmt.Sprintf("%v", metric.Value)
+			result = fmt.Sprintf("%v", *metric.Value)
 		} else {
-			result = fmt.Sprintf("%v", metric.Delta)
+			result = fmt.Sprintf("%v", *metric.Delta)
 		}
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
