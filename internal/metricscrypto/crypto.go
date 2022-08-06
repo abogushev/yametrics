@@ -8,19 +8,16 @@ import (
 )
 
 func GetMetricSign(m protocol.Metrics, key string) string {
+	var data string
 	switch m.MType {
 	case protocol.COUNTER:
-		return getSign(fmt.Sprintf("%s:%s:%d", m.ID, m.MType, *m.Delta), key)
+		data = fmt.Sprintf("%s:%s:%d", m.ID, m.MType, *m.Delta)
 	case protocol.GAUGE:
-		return getSign(fmt.Sprintf("%s:%s:%f", m.ID, m.MType, *m.Value), key)
+		data = fmt.Sprintf("%s:%s:%f", m.ID, m.MType, *m.Value)
 	default:
-		return ""
+		panic("key is not defined")
 	}
-}
-
-func getSign(key, msg string) string {
 	h := hmac.New(sha256.New, []byte(key))
-	h.Write([]byte(msg))
-
+	h.Write([]byte(data))
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
