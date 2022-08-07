@@ -18,13 +18,18 @@ import (
 )
 
 type Handler struct {
-	logger         *zap.SugaredLogger
-	metricsStorage storage.MetricsStorage
-	signKey        string
+	logger          *zap.SugaredLogger
+	metricsStorage  storage.MetricsStorage
+	dbMetricStorage *storage.DbMetricStorage
+	signKey         string
 }
 
-func NewHandler(logger *zap.SugaredLogger, metricsStorage storage.MetricsStorage, signKey string) Handler {
-	return Handler{logger: logger, metricsStorage: metricsStorage, signKey: signKey}
+func NewHandler(
+	logger *zap.SugaredLogger,
+	metricsStorage storage.MetricsStorage,
+	dbMetricStorage *storage.DbMetricStorage,
+	signKey string) Handler {
+	return Handler{logger: logger, metricsStorage: metricsStorage, dbMetricStorage: dbMetricStorage, signKey: signKey}
 }
 
 func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
@@ -155,5 +160,15 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	err1 := tmpl.Execute(w, allmtrcs)
 	if err1 != nil {
 		h.logger.Error("Error executing template: ", err1)
+	}
+}
+
+func (h *Handler) PingDb(w http.ResponseWriter, r *http.Request) {
+	err := h.dbMetricStorage.Ping()
+	if err == nil {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		h.logger.Error("error on ping db", err)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }

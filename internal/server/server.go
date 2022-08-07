@@ -12,8 +12,13 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run(logger *zap.SugaredLogger, cfg *config.ServerConfig, storage storage.MetricsStorage, ctx context.Context) {
-	handler := handlers.NewHandler(logger, storage, cfg.SignKey)
+func Run(
+	logger *zap.SugaredLogger,
+	cfg *config.ServerConfig,
+	storage storage.MetricsStorage,
+	dbstorage *storage.DbMetricStorage,
+	ctx context.Context) {
+	handler := handlers.NewHandler(logger, storage, dbstorage, cfg.SignKey)
 
 	r := chi.NewRouter()
 
@@ -35,6 +40,7 @@ func Run(logger *zap.SugaredLogger, cfg *config.ServerConfig, storage storage.Me
 	})
 
 	r.Route("/", func(r chi.Router) {
+		r.Get("/ping", handler.PingDb)
 		r.Get("/", handler.GetAllAsHTML)
 	})
 

@@ -37,6 +37,8 @@ func main() {
 		logger.Fatal("error on create metric storage", err)
 	}
 
-	server.Run(logger, cfgProvider.ServerCfg, metricsStorage, ctx)
+	dbstorage := storage.NewDbMetricStorage(cfgProvider.StorageCfg.DbUrl, ctx)
+
+	server.Run(logger, cfgProvider.ServerCfg, metricsStorage, dbstorage, ctx)
 	wg.Wait()
 }
