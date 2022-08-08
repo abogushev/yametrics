@@ -39,6 +39,6 @@ func main() {
 
 	dbstorage := storage.NewDbMetricStorage(cfgProvider.StorageCfg.DbUrl, ctx)
 
-	server.Run(logger, cfgProvider.ServerCfg, metricsStorage, dbstorage, ctx)
+	server.Run(logger, cfgProvider.ServerCfg, metricsStorage, *dbstorage, ctx)
 	wg.Wait()
 }

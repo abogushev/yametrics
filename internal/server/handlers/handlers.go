@@ -20,14 +20,14 @@ import (
 type Handler struct {
 	logger          *zap.SugaredLogger
 	metricsStorage  storage.MetricsStorage
-	dbMetricStorage *storage.DbMetricStorage
+	dbMetricStorage storage.DbMetricStorage
 	signKey         string
 }
 
 func NewHandler(
 	logger *zap.SugaredLogger,
 	metricsStorage storage.MetricsStorage,
-	dbMetricStorage *storage.DbMetricStorage,
+	dbMetricStorage storage.DbMetricStorage,
 	signKey string) Handler {
 	return Handler{logger: logger, metricsStorage: metricsStorage, dbMetricStorage: dbMetricStorage, signKey: signKey}
 }
