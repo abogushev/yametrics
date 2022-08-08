@@ -19,7 +19,16 @@ func NewDbMetricStorage(url string, ctx context.Context) (MetricsStorage, error)
 	if err != nil {
 		return nil, err
 	}
-	return &DbMetricStorage{url, ctx, dbpool}, nil
+	storage := &DbMetricStorage{url, ctx, dbpool}
+	if err := storage.initDb(); err != nil {
+		return nil, err
+	}
+	return storage, nil
+}
+
+func (db *DbMetricStorage) initDb() error {
+	_, err := db.dbpool.Exec(db.ctx, "create table if not exists metrics(id varchar not null primary key, mtype varchar not null, delta bigint, value double precision)")
+	return err
 }
 
 func (db *DbMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {

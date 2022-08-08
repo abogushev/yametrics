@@ -32,7 +32,7 @@ func main() {
 	} else {
 		metricstorage, err = storage.NewFileMetricsStorage(cfgProvider.StorageCfg, logger, ctx)
 	}
-
+	logger.Info("storage started successful")
 	if err != nil {
 		logger.Fatal("error on create metric storage", err)
 	}
