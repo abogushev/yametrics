@@ -39,7 +39,7 @@ func Run(
 	})
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/ping", handler.PingDb)
+		r.Get("/ping", handler.PingDB)
 		r.Get("/", handler.GetAllAsHTML)
 	})
 

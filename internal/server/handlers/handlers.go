@@ -171,7 +171,7 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) PingDb(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	if err := h.metricsStorage.Check(); err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {

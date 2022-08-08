@@ -8,30 +8,30 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-type DbMetricStorage struct {
+type DBMetricStorage struct {
 	url    string
 	ctx    context.Context
 	dbpool *pgxpool.Pool
 }
 
-func NewDbMetricStorage(url string, ctx context.Context) (MetricsStorage, error) {
+func NewDBMetricStorage(url string, ctx context.Context) (MetricsStorage, error) {
 	dbpool, err := pgxpool.Connect(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-	storage := &DbMetricStorage{url, ctx, dbpool}
-	if err := storage.initDb(); err != nil {
+	storage := &DBMetricStorage{url, ctx, dbpool}
+	if err := storage.initDB(); err != nil {
 		return nil, err
 	}
 	return storage, nil
 }
 
-func (db *DbMetricStorage) initDb() error {
+func (db *DBMetricStorage) initDB() error {
 	_, err := db.dbpool.Exec(db.ctx, "create table if not exists metrics(id varchar not null primary key, mtype varchar not null, delta bigint, value double precision)")
 	return err
 }
 
-func (db *DbMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {
+func (db *DBMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {
 	metric := models.Metrics{}
 	row := db.dbpool.QueryRow(db.ctx, "select id, mtype, delta, value from metrics where id = $1 and mtype = $2", id, mtype)
 	err := row.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value)
@@ -44,7 +44,7 @@ func (db *DbMetricStorage) Get(id string, mtype string) (*models.Metrics, error)
 	}
 }
 
-func (db *DbMetricStorage) GetAll() ([]models.Metrics, error) {
+func (db *DBMetricStorage) GetAll() ([]models.Metrics, error) {
 	metrics := make([]models.Metrics, 0)
 	rows, err := db.dbpool.Query(db.ctx, "select id, mtype, delta, value from metrics")
 	if err != nil {
@@ -64,7 +64,7 @@ func (db *DbMetricStorage) GetAll() ([]models.Metrics, error) {
 	return metrics, nil
 }
 
-func (db *DbMetricStorage) Update(m *models.Metrics) error {
+func (db *DBMetricStorage) Update(m *models.Metrics) error {
 	if stored, err := db.Get(m.ID, m.MType); err != nil {
 		return err
 	} else if stored != nil && stored.MType == models.COUNTER {
@@ -78,10 +78,10 @@ func (db *DbMetricStorage) Update(m *models.Metrics) error {
 	return nil
 }
 
-func (db *DbMetricStorage) Check() error {
+func (db *DBMetricStorage) Check() error {
 	return db.dbpool.Ping(db.ctx)
 }
 
-func (db *DbMetricStorage) Close() {
+func (db *DBMetricStorage) Close() {
 	db.dbpool.Close()
 }
