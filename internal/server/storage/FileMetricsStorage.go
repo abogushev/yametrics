@@ -13,70 +13,70 @@ import (
 	"go.uber.org/zap"
 )
 
-type MetricsStorage interface {
-	Get(id string, mtype string) *models.Metrics
-	GetAll() []models.Metrics
-	Update(models.Metrics)
-}
-
-type metricsStorageImpl struct {
+type fileMetricsStorage struct {
 	mutex   sync.Mutex
 	metrics map[string]*models.Metrics
 	logger  *zap.SugaredLogger
 	cfg     *config.MetricsStorageConfig
 }
 
-func NewMetricsStorageImpl(
+func NewFileMetricsStorage(
 	cfg *config.MetricsStorageConfig,
 	logger *zap.SugaredLogger,
-	ctx context.Context,
-	wg *sync.WaitGroup) (MetricsStorage, error) {
-	storage := &metricsStorageImpl{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
+	ctx context.Context) (MetricsStorage, error) {
+	storage := &fileMetricsStorage{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
 	if cfg.Restore {
 		if err := storage.loadMetrics(); err != nil {
 			return nil, err
 		}
 	}
 	if cfg.StoreFile != "" {
-		go storage.runSaveMetricsJob(ctx, wg)
+		go storage.runSaveMetricsJob(ctx)
 	}
 	return storage, nil
 }
 
-func (s *metricsStorageImpl) Get(id string, mtype string) *models.Metrics {
+func (s *fileMetricsStorage) Get(id string, mtype string) (*models.Metrics, error) {
 	if metric, ok := s.metrics[id]; ok && metric.MType == mtype {
 		v := *metric
-		return &v
+		return &v, nil
 	} else {
-		return nil
+		return nil, nil
 	}
 }
 
-func (s *metricsStorageImpl) GetAll() []models.Metrics {
+func (s *fileMetricsStorage) GetAll() ([]models.Metrics, error) {
 	m := make([]models.Metrics, len(s.metrics))
 	i := 0
 	for _, v := range s.metrics {
 		m[i] = *v
 		i++
 	}
-	return m
+	return m, nil
 }
 
-func (s *metricsStorageImpl) Update(m models.Metrics) {
+func (s *fileMetricsStorage) Update(m *models.Metrics) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if v, ok := s.metrics[m.ID]; ok && v.MType == models.COUNTER {
 		*v.Delta += *m.Delta
 	} else {
-		s.metrics[m.ID] = &m
+		s.metrics[m.ID] = m
 	}
+	return nil
 }
 
-func (s *metricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.WaitGroup) {
+func (s *fileMetricsStorage) Close() {
+	s.saveMetrics()
+}
+
+func (s *fileMetricsStorage) Check() error {
+	return nil
+}
+
+func (s *fileMetricsStorage) runSaveMetricsJob(ctx context.Context) {
 	ticker := time.NewTicker(s.cfg.StoreInterval)
-	wg.Add(1)
-	defer wg.Done()
 
 	for {
 		select {
@@ -85,14 +85,13 @@ func (s *metricsStorageImpl) runSaveMetricsJob(ctx context.Context, wg *sync.Wai
 
 		case <-ctx.Done():
 			ticker.Stop()
-			s.saveMetrics()
 			s.logger.Info("stop runSaveMetricsJob")
 			return
 		}
 	}
 }
 
-func (s *metricsStorageImpl) saveMetrics() {
+func (s *fileMetricsStorage) saveMetrics() {
 	s.logger.Info("starting save metrics...")
 	if file, err := os.OpenFile(s.cfg.StoreFile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0777); err != nil {
 		s.logger.Error("error on save metrics", err)
@@ -107,7 +106,7 @@ func (s *metricsStorageImpl) saveMetrics() {
 	}
 }
 
-func (s *metricsStorageImpl) loadMetrics() error {
+func (s *fileMetricsStorage) loadMetrics() error {
 	s.logger.Info("starting load metrics...")
 	if file, err := os.OpenFile(s.cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0777); err != nil {
 		s.logger.Error("error on load metrics", err)

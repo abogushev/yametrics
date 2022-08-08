@@ -22,35 +22,33 @@ type MockMetricStorage struct {
 	mock.Mock
 }
 
-type MockDbStorage struct {
-	mock.Mock
-}
-
 func getLogger() *zap.SugaredLogger {
 	l, _ := zap.NewProduction()
 	return l.Sugar()
 }
 
-func (s *MockMetricStorage) Get(id string, mtype string) *models.Metrics {
+func (s *MockMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {
 	rs := s.Called(id, mtype)
 	if result := rs.Get(0); result != nil {
-		return result.(*models.Metrics)
+		return result.(*models.Metrics), nil
 	} else {
-		return nil
+		return nil, nil
 	}
 }
 
-func (s *MockMetricStorage) GetAll() []models.Metrics {
+func (s *MockMetricStorage) GetAll() ([]models.Metrics, error) {
 	rs := s.Called()
-	return rs.Get(0).([]models.Metrics)
+	return rs.Get(0).([]models.Metrics), nil
 }
 
-func (s *MockMetricStorage) Update(m models.Metrics) {}
+func (s *MockMetricStorage) Update(m *models.Metrics) error { return nil }
+
+func (s *MockMetricStorage) Check() error { return nil }
+func (s *MockMetricStorage) Close()       {}
 
 func TestGetV2(t *testing.T) {
 	metricStorage := new(MockMetricStorage)
-	db := storage.DbMetricStorage{}
-	handler := &Handler{getLogger(), metricStorage, db, ""}
+	handler := &Handler{getLogger(), metricStorage, ""}
 	tests := []struct {
 		name     string
 		code     int
@@ -102,7 +100,7 @@ func TestGetV2(t *testing.T) {
 
 func TestUpdateV2(t *testing.T) {
 	v := 1.0
-	handler := &Handler{getLogger(), new(MockMetricStorage), storage.DbMetricStorage{}, ""}
+	handler := &Handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
 		code int
@@ -139,7 +137,7 @@ func TestUpdateV2(t *testing.T) {
 }
 
 func TestUpdateV1(t *testing.T) {
-	handler := &Handler{getLogger(), new(MockMetricStorage), storage.DbMetricStorage{}, ""}
+	handler := &Handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
 		code int
@@ -297,7 +295,7 @@ func TestGetV1(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, tt.rctx))
 			w := httptest.NewRecorder()
-			handler := &Handler{getLogger(), tt.metricStorage, storage.DbMetricStorage{}, ""}
+			handler := &Handler{getLogger(), tt.metricStorage, ""}
 			h := http.HandlerFunc(handler.GetV1)
 			h.ServeHTTP(w, request)
 			res := w.Result()

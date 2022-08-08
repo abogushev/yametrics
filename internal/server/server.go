@@ -16,9 +16,8 @@ func Run(
 	logger *zap.SugaredLogger,
 	cfg *config.ServerConfig,
 	storage storage.MetricsStorage,
-	dbstorage storage.DbMetricStorage,
 	ctx context.Context) {
-	handler := handlers.NewHandler(logger, storage, dbstorage, cfg.SignKey)
+	handler := handlers.NewHandler(logger, storage, cfg.SignKey)
 
 	r := chi.NewRouter()
 

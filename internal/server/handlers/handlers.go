@@ -18,18 +18,16 @@ import (
 )
 
 type Handler struct {
-	logger          *zap.SugaredLogger
-	metricsStorage  storage.MetricsStorage
-	dbMetricStorage storage.DbMetricStorage
-	signKey         string
+	logger         *zap.SugaredLogger
+	metricsStorage storage.MetricsStorage
+	signKey        string
 }
 
 func NewHandler(
 	logger *zap.SugaredLogger,
 	metricsStorage storage.MetricsStorage,
-	dbMetricStorage storage.DbMetricStorage,
 	signKey string) Handler {
-	return Handler{logger: logger, metricsStorage: metricsStorage, dbMetricStorage: dbMetricStorage, signKey: signKey}
+	return Handler{logger: logger, metricsStorage: metricsStorage, signKey: signKey}
 }
 
 func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +37,7 @@ func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.signKey == "" || metricscrypto.GetMetricSign(metric, h.signKey) == metric.Hash {
-		h.metricsStorage.Update(models.Metrics{ID: metric.ID, MType: metric.MType, Delta: metric.Delta, Value: metric.Value})
+		h.metricsStorage.Update(&models.Metrics{ID: metric.ID, MType: metric.MType, Delta: metric.Delta, Value: metric.Value})
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -54,7 +52,12 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if metric := h.metricsStorage.Get(metric.ID, metric.MType); metric != nil {
+	if metric, err := h.metricsStorage.Get(metric.ID, metric.MType); err != nil {
+		h.logger.Error("error on GetV2", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if metric == nil {
+		w.WriteHeader(http.StatusNotFound)
+	} else {
 		protocolMetric := protocol.Metrics{ID: metric.ID, MType: metric.MType, Value: metric.Value, Delta: metric.Delta}
 		if h.signKey != "" {
 			protocolMetric.Hash = metricscrypto.GetMetricSign(protocolMetric, h.signKey)
@@ -62,8 +65,6 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(protocolMetric)
-	} else {
-		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
@@ -95,7 +96,7 @@ func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqError == nil {
-		h.metricsStorage.Update(metric)
+		h.metricsStorage.Update(&metric)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -111,7 +112,10 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	if metricType != models.COUNTER && metricType != models.GAUGE {
 		h.logger.Errorf("wrong metric type: %v", metricType)
 		w.WriteHeader(http.StatusBadRequest)
-	} else if metric := h.metricsStorage.Get(metricName, metricType); metric == nil {
+	} else if metric, err := h.metricsStorage.Get(metricName, metricType); err != nil {
+		h.logger.Error("error on GetV1", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if metric == nil {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
 		var result string
@@ -127,19 +131,22 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
-	storageMetrics := h.metricsStorage.GetAll()
-	allmtrcs := make([]string, len(storageMetrics))
+	if storageMetrics, err := h.metricsStorage.GetAll(); err != nil {
+		h.logger.Error("error on GetAllAsHTML", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		allmtrcs := make([]string, len(storageMetrics))
 
-	for v, i := "", 0; i < len(storageMetrics); i++ {
-		if storageMetrics[i].MType == protocol.GAUGE {
-			v = fmt.Sprintf("%v", storageMetrics[i].Value)
-		} else {
-			v = fmt.Sprintf("%v", storageMetrics[i].Delta)
+		for v, i := "", 0; i < len(storageMetrics); i++ {
+			if storageMetrics[i].MType == protocol.GAUGE {
+				v = fmt.Sprintf("%v", storageMetrics[i].Value)
+			} else {
+				v = fmt.Sprintf("%v", storageMetrics[i].Delta)
+			}
+			allmtrcs[i] = fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v)
 		}
-		allmtrcs[i] = fmt.Sprintf("name: %v value: %v", storageMetrics[i].ID, v)
-	}
 
-	tmpl, err := template.New("test").Parse(`
+		tmpl, err := template.New("test").Parse(`
 		<html>
 			<head>
 			<title></title>
@@ -151,21 +158,21 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 			</body>
 		</html>`)
 
-	if err != nil {
-		h.logger.Error("Error Parsing template: ", err)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	err1 := tmpl.Execute(w, allmtrcs)
-	if err1 != nil {
-		h.logger.Error("Error executing template: ", err1)
+		if err != nil {
+			h.logger.Error("Error Parsing template: ", err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		err1 := tmpl.Execute(w, allmtrcs)
+		if err1 != nil {
+			h.logger.Error("Error executing template: ", err1)
+		}
 	}
 }
 
 func (h *Handler) PingDb(w http.ResponseWriter, r *http.Request) {
-	err := h.dbMetricStorage.Ping()
-	if err == nil {
+	if err := h.metricsStorage.Check(); err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		h.logger.Error("error on ping db", err)
