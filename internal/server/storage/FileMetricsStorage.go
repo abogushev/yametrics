@@ -36,6 +36,13 @@ func NewFileMetricsStorage(
 	return storage, nil
 }
 
+func (s *fileMetricsStorage) Updates(metrics []models.Metrics) error {
+	for i := 0; i < len(metrics); i++ {
+		s.Update(&metrics[i])
+	}
+	return nil
+}
+
 func (s *fileMetricsStorage) Get(id string, mtype string) (*models.Metrics, error) {
 	if metric, ok := s.metrics[id]; ok && metric.MType == mtype {
 		v := *metric

@@ -43,8 +43,9 @@ func (s *MockMetricStorage) GetAll() ([]models.Metrics, error) {
 
 func (s *MockMetricStorage) Update(m *models.Metrics) error { return nil }
 
-func (s *MockMetricStorage) Check() error { return nil }
-func (s *MockMetricStorage) Close()       {}
+func (s *MockMetricStorage) Check() error                   { return nil }
+func (s *MockMetricStorage) Close()                         {}
+func (s *MockMetricStorage) Updates([]models.Metrics) error { return nil }
 
 func TestGetV2(t *testing.T) {
 	metricStorage := new(MockMetricStorage)

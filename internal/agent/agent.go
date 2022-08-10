@@ -72,7 +72,20 @@ func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
 }
 
 func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
-	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2() }, ctx, agent.config.ReportInterval, "sending metrics")
+	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2(); agent.sendMultipleMetricsV2() }, ctx, agent.config.ReportInterval, "sending metrics")
+}
+
+func (agent *Agent) sendMultipleMetricsV2() {
+	apiMetrics := agent.metrics.ToAPI()
+	if json, err := json.Marshal(apiMetrics); err != nil {
+		agent.logger.Errorf("error on  Marshal metric: %s", err)
+	} else {
+		if r, err := agent.client.Post(fmt.Sprintf("%s/updates", agent.url), "application/json", bytes.NewBuffer(json)); err != nil {
+			agent.logger.Errorf("error in send metric: %s", err)
+		} else {
+			r.Body.Close()
+		}
+	}
 }
 
 func (agent *Agent) sendMetricsV2() {

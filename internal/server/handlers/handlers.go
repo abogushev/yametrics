@@ -30,6 +30,25 @@ func NewHandler(
 	return Handler{logger: logger, metricsStorage: metricsStorage, signKey: signKey}
 }
 
+func (h *Handler) UpdatesV2(w http.ResponseWriter, r *http.Request) {
+	var metrics []protocol.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	modelMetrics := make([]models.Metrics, len(metrics))
+	for i := 0; i < len(modelMetrics); i++ {
+		modelMetrics[i] = models.Metrics{ID: metrics[i].ID, MType: metrics[i].MType, Delta: metrics[i].Delta, Value: metrics[i].Value}
+	}
+
+	if err := h.metricsStorage.Updates(modelMetrics); err != nil {
+		h.logger.Error("error on UpdatesV2", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
 	var metric protocol.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {

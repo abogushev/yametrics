@@ -33,6 +33,10 @@ func Run(
 		r.Post("/", handler.UpdateV2)
 	})
 
+	r.Route("/updates", func(r chi.Router) {
+		r.Post("/", handler.UpdatesV2)
+	})
+
 	r.Route("/value", func(r chi.Router) {
 		r.Get("/{type}/{name}", handler.GetV1)
 		r.Post("/", handler.GetV2)

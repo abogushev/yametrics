@@ -6,8 +6,8 @@ const (
 )
 
 type Metrics struct {
-	ID    string
-	MType string
-	Delta *int64
-	Value *float64
+	ID    string   `db:"id"`
+	MType string   `db:"mtype"`
+	Delta *int64   `db:"delta"`
+	Value *float64 `db:"value"`
 }
