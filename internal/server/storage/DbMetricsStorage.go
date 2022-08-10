@@ -29,6 +29,7 @@ func NewDBMetricStorage(url string, ctx context.Context) (MetricsStorage, error)
 }
 
 var insertStmt *sqlx.NamedStmt
+var upInsertStmt *sqlx.NamedStmt
 
 func (db *DBMetricStorage) initDB() error {
 	_, err := db.xdb.ExecContext(db.ctx, "create table if not exists metrics(id varchar not null primary key, mtype varchar not null, delta bigint, value double precision)")
@@ -38,6 +39,10 @@ func (db *DBMetricStorage) initDB() error {
 	}
 
 	insertStmt, err = db.xdb.PrepareNamed("insert into metrics(id, mtype, delta, value) values(:id, :mtype, :delta, :value) on conflict(id) do update set mtype = :mtype, delta = :delta, value = :value")
+	if err != nil {
+		return err
+	}
+	upInsertStmt, err = db.xdb.PrepareNamed("insert into metrics(id, mtype, delta, value) values(:id, :mtype, :delta, :value) on conflict(id) do update set mtype = :mtype, delta = case when metrics.mtype = 'counter' then metrics.delta + :delta end, value = case when metrics.mtype = 'gauge' then CAST(:value AS DOUBLE PRECISION) end")
 
 	return err
 }
@@ -85,7 +90,7 @@ func (db *DBMetricStorage) Updates(mtrcs []models.Metrics) error {
 	defer tx.Rollback()
 
 	for i := 0; i < len(mtrcs); i++ {
-		if _, err := insertStmt.ExecContext(db.ctx, &mtrcs[i]); err != nil {
+		if _, err := upInsertStmt.ExecContext(db.ctx, &mtrcs[i]); err != nil {
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
