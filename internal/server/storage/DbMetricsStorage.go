@@ -2,9 +2,10 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"yametrics/internal/server/models"
 
-	"github.com/jackc/pgx"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -47,7 +48,7 @@ func (db *DBMetricStorage) Get(id string, mtype string) (*models.Metrics, error)
 	err := row.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value)
 	if err == nil {
 		return &metric, nil
-	} else if err == pgx.ErrNoRows {
+	} else if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else {
 		return nil, err
