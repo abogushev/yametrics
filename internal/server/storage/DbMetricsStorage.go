@@ -55,8 +55,8 @@ func (db *DBMetricStorage) Get(id string, mtype string) (*models.Metrics, error)
 }
 
 func (db *DBMetricStorage) GetAll() ([]models.Metrics, error) {
-	metrics := make([]models.Metrics, 0)
-	if err := db.xdb.SelectContext(db.ctx, metrics, "select id, mtype, delta, value from metrics"); err != nil {
+	metrics := []models.Metrics{}
+	if err := db.xdb.SelectContext(db.ctx, &metrics, "select id, mtype, delta, value from metrics"); err != nil {
 		return nil, err
 	} else {
 		return metrics, nil
