@@ -44,8 +44,7 @@ func (db *DBMetricStorage) initDB() error {
 
 func (db *DBMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {
 	metric := models.Metrics{}
-	row := db.xdb.QueryRowContext(db.ctx, "select id, mtype, delta, value from metrics where id = $1 and mtype = $2", id, mtype)
-	err := row.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value)
+	err := db.xdb.GetContext(db.ctx, &metric, "select id, mtype, delta, value from metrics where id = $1 and mtype = $2", id, mtype)
 	if err == nil {
 		return &metric, nil
 	} else if errors.Is(err, sql.ErrNoRows) {
@@ -57,22 +56,11 @@ func (db *DBMetricStorage) Get(id string, mtype string) (*models.Metrics, error)
 
 func (db *DBMetricStorage) GetAll() ([]models.Metrics, error) {
 	metrics := make([]models.Metrics, 0)
-	rows, err := db.xdb.QueryContext(db.ctx, "select id, mtype, delta, value from metrics")
-	if err != nil {
+	if err := db.xdb.SelectContext(db.ctx, metrics, "select id, mtype, delta, value from metrics"); err != nil {
 		return nil, err
+	} else {
+		return metrics, nil
 	}
-	for rows.Next() {
-		metric := models.Metrics{}
-		err := rows.Scan(&metric.ID, &metric.MType, metric.Delta, metric.Value)
-		if err != nil {
-			return nil, err
-		}
-		metrics = append(metrics, metric)
-	}
-	if rows.Err() != nil {
-		return nil, err
-	}
-	return metrics, nil
 }
 
 func (db *DBMetricStorage) Update(m *models.Metrics) error {
