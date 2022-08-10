@@ -18,7 +18,7 @@ func main() {
 
 	l, err := zap.NewProduction()
 	if err != nil {
-		log.Fatalf("error on create logger: %w", err)
+		log.Fatalf("error on create logger: %v", err)
 	}
 	logger := l.Sugar()
 	defer logger.Sync()
