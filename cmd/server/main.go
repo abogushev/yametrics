@@ -18,7 +18,7 @@ func main() {
 
 	l, err := zap.NewProduction()
 	if err != nil {
-		log.Fatal("error on create logger", err)
+		log.Fatalf("error on create logger: %w", err)
 	}
 	logger := l.Sugar()
 	defer logger.Sync()
@@ -34,7 +34,7 @@ func main() {
 	}
 	logger.Info("storage started successful")
 	if err != nil {
-		logger.Fatal("error on create metric storage", err)
+		logger.Fatalf("error on create metric storage %w", err)
 	}
 
 	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx)
