@@ -34,7 +34,7 @@ func main() {
 	}
 	logger.Info("storage started successful")
 	if err != nil {
-		logger.Fatalf("error on create metric storage %w", err)
+		logger.Fatalf("error on create metric storage %v", err)
 	}
 
 	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx)
