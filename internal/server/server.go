@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
@@ -50,16 +51,16 @@ func Run(
 	server := &http.Server{Addr: cfg.Address, Handler: r}
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("server start error: %s\n", err)
+		if err := server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+			logger.Fatalf("server start error: %w", err)
 		}
 	}()
 	logger.Info("server started successfuly")
 
 	<-ctx.Done()
 	logger.Info("get stop signal, start shutdown server")
-	if err := server.Shutdown(ctx); err != nil && err != context.Canceled {
-		logger.Fatalf("Server Shutdown Failed:%+v", err)
+	if err := server.Shutdown(ctx); err != nil && errors.Is(err, context.Canceled) {
+		logger.Fatalf("Server Shutdown Failed:%w", err)
 	} else {
 		logger.Info("server stopped successfully")
 	}

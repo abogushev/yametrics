@@ -42,7 +42,7 @@ func (h *Handler) UpdatesV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.metricsStorage.Updates(modelMetrics); err != nil {
-		h.logger.Error("error on UpdatesV2", err)
+		h.logger.Errorf("error on UpdatesV2: %w", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -72,7 +72,7 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if metric, err := h.metricsStorage.Get(metric.ID, metric.MType); err != nil {
-		h.logger.Error("error on GetV2", err)
+		h.logger.Errorf("error on GetV2: %w", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if metric == nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -132,7 +132,7 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 		h.logger.Errorf("wrong metric type: %v", metricType)
 		w.WriteHeader(http.StatusBadRequest)
 	} else if metric, err := h.metricsStorage.Get(metricName, metricType); err != nil {
-		h.logger.Error("error on GetV1", err)
+		h.logger.Errorf("error on GetV1, %w", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if metric == nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -151,7 +151,7 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	if storageMetrics, err := h.metricsStorage.GetAll(); err != nil {
-		h.logger.Error("error on GetAllAsHTML", err)
+		h.logger.Errorf("error on GetAllAsHTML: %w", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		allmtrcs := make([]string, len(storageMetrics))
@@ -178,14 +178,14 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 		</html>`)
 
 		if err != nil {
-			h.logger.Error("Error Parsing template: ", err)
+			h.logger.Errorf("Error Parsing template: %w", err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		err1 := tmpl.Execute(w, allmtrcs)
 		if err1 != nil {
-			h.logger.Error("Error executing template: ", err1)
+			h.logger.Errorf("Error executing template: %w", err1)
 		}
 	}
 }
@@ -194,7 +194,7 @@ func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	if err := h.metricsStorage.Check(); err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {
-		h.logger.Error("error on ping db", err)
+		h.logger.Errorf("error on ping db: %w", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }

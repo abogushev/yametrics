@@ -101,7 +101,7 @@ func (s *fileMetricsStorage) runSaveMetricsJob(ctx context.Context) {
 func (s *fileMetricsStorage) saveMetrics() {
 	s.logger.Info("starting save metrics...")
 	if file, err := os.OpenFile(s.cfg.StoreFile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0777); err != nil {
-		s.logger.Error("error on save metrics", err)
+		s.logger.Errorf("error on save metrics: %w", err)
 
 	} else {
 		defer file.Close()
@@ -116,7 +116,7 @@ func (s *fileMetricsStorage) saveMetrics() {
 func (s *fileMetricsStorage) loadMetrics() error {
 	s.logger.Info("starting load metrics...")
 	if file, err := os.OpenFile(s.cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0777); err != nil {
-		s.logger.Error("error on load metrics", err)
+		s.logger.Errorf("error on load metrics: %w", err)
 		return err
 	} else {
 		defer file.Close()
@@ -129,7 +129,7 @@ func (s *fileMetricsStorage) loadMetrics() error {
 				s.logger.Info("load metrics completed")
 				return nil
 			} else if err != nil {
-				s.logger.Error("error on read from file", err)
+				s.logger.Errorf("error on read from file: %w", err)
 				return err
 			} else {
 				metrics[m.ID] = &m

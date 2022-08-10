@@ -78,10 +78,10 @@ func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
 func (agent *Agent) sendMultipleMetricsV2() {
 	apiMetrics := agent.metrics.ToAPI()
 	if json, err := json.Marshal(apiMetrics); err != nil {
-		agent.logger.Errorf("error on  Marshal metric: %s", err)
+		agent.logger.Errorf("error on  Marshal metric: %w", err)
 	} else {
 		if r, err := agent.client.Post(fmt.Sprintf("%s/updates", agent.url), "application/json", bytes.NewBuffer(json)); err != nil {
-			agent.logger.Errorf("error in send metric: %s", err)
+			agent.logger.Errorf("error in send metric: %w", err)
 		} else {
 			r.Body.Close()
 		}
@@ -98,9 +98,9 @@ func (agent *Agent) sendMetricsV2() {
 
 	for i := 0; i < len(apiMetrics); i++ {
 		if json, err := json.Marshal(apiMetrics[i]); err != nil {
-			agent.logger.Errorf("error in Marshal metric: %s", err)
+			agent.logger.Errorf("error in Marshal metric: %w", err)
 		} else if r, err := agent.client.Post(fmt.Sprintf("%s/update", agent.url), "application/json", bytes.NewBuffer(json)); err != nil {
-			agent.logger.Errorf("error in send metric: %s", err)
+			agent.logger.Errorf("error in send metric: %w", err)
 		} else {
 			r.Body.Close()
 		}
@@ -110,7 +110,7 @@ func (agent *Agent) sendMetricsV2() {
 func (agent *Agent) sendMetricsV1() {
 	send := func(url string) {
 		if r, err := agent.client.Post(url, "text/plain", nil); err != nil {
-			agent.logger.Errorf("error in send metric: %s", err)
+			agent.logger.Errorf("error in send metric: %w", err)
 		} else {
 			r.Body.Close()
 		}
