@@ -12,13 +12,13 @@ import (
 )
 
 const (
-	createTableIfNeedSql = `create table if not exists metrics(
+	createTableIfNeedSQL = `create table if not exists metrics(
 		id varchar not null primary key,
 		mtype varchar not null,
 		delta bigint,
 		value double precision)`
 
-	upInsertSql = `insert into metrics(
+	upInsertSQL = `insert into metrics(
 		id,
 		mtype,
 		delta,
@@ -34,9 +34,8 @@ const (
 		mtype = :mtype, 
 		delta = case when metrics.mtype = 'counter' then metrics.delta + :delta end,
 		value = case when metrics.mtype = 'gauge' then CAST(:value AS DOUBLE PRECISION) end`
-	getSql    = `select id, mtype, delta, value from metrics where id = $1 and mtype = $2`
-	getAllSql = `select id, mtype, delta, value from metrics`
-	updateSql = `update metrics set mtype = $1, delta = $2, value = $3 where id = $4`
+	getSQL    = `select id, mtype, delta, value from metrics where id = $1 and mtype = $2`
+	getAllSQL = `select id, mtype, delta, value from metrics`
 )
 
 type dbMetricStorage struct {
@@ -66,20 +65,20 @@ func NewDBMetricStorage(url string, ctx context.Context, logger *zap.SugaredLogg
 var upInsertStmt *sqlx.NamedStmt
 
 func (db *dbMetricStorage) initDB() error {
-	_, err := db.xdb.ExecContext(db.ctx, createTableIfNeedSql)
+	_, err := db.xdb.ExecContext(db.ctx, createTableIfNeedSQL)
 
 	if err != nil {
 		return err
 	}
 
-	upInsertStmt, err = db.xdb.PrepareNamed(upInsertSql)
+	upInsertStmt, err = db.xdb.PrepareNamed(upInsertSQL)
 
 	return err
 }
 
 func (db *dbMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {
 	metric := models.Metrics{}
-	err := db.xdb.GetContext(db.ctx, &metric, getSql, id, mtype)
+	err := db.xdb.GetContext(db.ctx, &metric, getSQL, id, mtype)
 	if err == nil {
 		return &metric, nil
 	} else if errors.Is(err, sql.ErrNoRows) {
@@ -91,7 +90,7 @@ func (db *dbMetricStorage) Get(id string, mtype string) (*models.Metrics, error)
 
 func (db *dbMetricStorage) GetAll() ([]models.Metrics, error) {
 	metrics := []models.Metrics{}
-	if err := db.xdb.SelectContext(db.ctx, &metrics, getAllSql); err != nil {
+	if err := db.xdb.SelectContext(db.ctx, &metrics, getAllSQL); err != nil {
 		return nil, err
 	}
 	return metrics, nil
