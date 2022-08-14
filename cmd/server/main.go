@@ -27,8 +27,8 @@ func main() {
 
 	var metricstorage storage.MetricsStorage
 
-	if dbURL := cfgProvider.StorageCfg.DBURL; dbURL != "" {
-		metricstorage, err = storage.NewDBMetricStorage(dbURL, ctx)
+	if len(cfgProvider.StorageCfg.DBURL) != 0 {
+		metricstorage, err = storage.NewDBMetricStorage(cfgProvider.StorageCfg.DBURL, ctx, logger)
 	} else {
 		metricstorage, err = storage.NewFileMetricsStorage(cfgProvider.StorageCfg, logger, ctx)
 	}

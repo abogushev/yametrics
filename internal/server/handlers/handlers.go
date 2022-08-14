@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type Handler struct {
+type handler struct {
 	logger         *zap.SugaredLogger
 	metricsStorage storage.MetricsStorage
 	signKey        string
@@ -26,11 +26,11 @@ type Handler struct {
 func NewHandler(
 	logger *zap.SugaredLogger,
 	metricsStorage storage.MetricsStorage,
-	signKey string) Handler {
-	return Handler{logger: logger, metricsStorage: metricsStorage, signKey: signKey}
+	signKey string) handler {
+	return handler{logger: logger, metricsStorage: metricsStorage, signKey: signKey}
 }
 
-func (h *Handler) UpdatesV2(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdatesV2(w http.ResponseWriter, r *http.Request) {
 	var metrics []protocol.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -49,7 +49,7 @@ func (h *Handler) UpdatesV2(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
 	var metric protocol.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -64,7 +64,7 @@ func (h *Handler) UpdateV2(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetV2(w http.ResponseWriter, r *http.Request) {
 	var metric protocol.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -87,7 +87,7 @@ func (h *Handler) GetV2(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
 	mtype := chi.URLParam(r, "type")
@@ -124,7 +124,7 @@ func (h *Handler) UpdateV1(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
@@ -149,7 +149,7 @@ func (h *Handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	if storageMetrics, err := h.metricsStorage.GetAll(); err != nil {
 		h.logger.Errorf("error on GetAllAsHTML: %w", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -190,7 +190,7 @@ func (h *Handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
+func (h *handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	if err := h.metricsStorage.Check(); err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {

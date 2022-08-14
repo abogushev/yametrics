@@ -1,6 +1,9 @@
 package storage
 
-import "yametrics/internal/server/models"
+import (
+	"fmt"
+	"yametrics/internal/server/models"
+)
 
 type MetricsStorage interface {
 	Get(id string, mtype string) (*models.Metrics, error)
@@ -9,4 +12,16 @@ type MetricsStorage interface {
 	Updates([]models.Metrics) error
 	Close()
 	Check() error
+}
+
+type storageInitError struct {
+	err error
+}
+
+func (s *storageInitError) Error() string {
+	return fmt.Sprintf("error on init storage: %v", s.err)
+}
+
+func NewStorageInitError(err error) error {
+	return &storageInitError{err}
 }
