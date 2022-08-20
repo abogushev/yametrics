@@ -40,10 +40,9 @@ func NewAgent(l *zap.SugaredLogger, config *config.AgentConfig) *Agent {
 
 func (agent *Agent) RunSync(ctx context.Context) {
 	wg := &sync.WaitGroup{}
-
+	wg.Add(3)
 	go agent.updateMetricsWithInterval(ctx, wg)
 	go agent.collectAdditional(ctx, wg)
-
 	go agent.sendMetricsWithInterval(ctx, wg)
 
 	agent.logger.Info("agent started")
@@ -52,7 +51,6 @@ func (agent *Agent) RunSync(ctx context.Context) {
 }
 
 func (agent *Agent) collectAdditional(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
 	defer wg.Done()
 	agent.schedule(
 		func() {
@@ -67,24 +65,7 @@ func (agent *Agent) collectAdditional(ctx context.Context, wg *sync.WaitGroup) {
 		"collecting additional metrics")
 }
 
-func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
-	ticker := time.NewTicker(duration)
-	for {
-		select {
-		case <-ticker.C:
-			agent.logger.Infof("call task: %s", name)
-			f()
-
-		case <-ctx.Done():
-			ticker.Stop()
-			agent.logger.Infof("cancel task: %s", name)
-			return
-		}
-	}
-}
-
 func (agent *Agent) updateMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
 	defer wg.Done()
 	agent.schedule(
 		func() {
@@ -98,7 +79,6 @@ func (agent *Agent) updateMetricsWithInterval(ctx context.Context, wg *sync.Wait
 }
 
 func (agent *Agent) sendMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
 	defer wg.Done()
 	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2(); agent.sendMultipleMetricsV2() }, ctx, agent.config.ReportInterval, "sending metrics")
 }
@@ -152,4 +132,20 @@ func (agent *Agent) sendMetricsV1() {
 			send(fmt.Sprintf("%s/update/counter/%s/%v", agent.url, key, v))
 		},
 	)
+}
+
+func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
+	ticker := time.NewTicker(duration)
+	for {
+		select {
+		case <-ticker.C:
+			agent.logger.Infof("call task: %s", name)
+			f()
+
+		case <-ctx.Done():
+			ticker.Stop()
+			agent.logger.Infof("cancel task: %s", name)
+			return
+		}
+	}
 }
