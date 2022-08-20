@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"yametrics/internal/protocol"
 	"yametrics/internal/server/models"
 	"yametrics/internal/server/storage"
 
@@ -26,49 +27,50 @@ func getLogger() *zap.SugaredLogger {
 	return l.Sugar()
 }
 
-func (s *MockMetricStorage) Get(m models.Metrics) (*models.Metrics, bool) {
-	rs := s.Called(m)
-
-	return rs.Get(0).(*models.Metrics), rs.Bool(1)
-}
-func (s *MockMetricStorage) GetGauge(id string) (*models.Metrics, bool) {
-	rs := s.Called(id)
-	return rs.Get(0).(*models.Metrics), rs.Bool(1)
-}
-func (s *MockMetricStorage) GetCounter(id string) (*models.Metrics, bool) {
-	rs := s.Called(id)
-	return rs.Get(0).(*models.Metrics), rs.Bool(1)
+func (s *MockMetricStorage) Get(id string, mtype string) (*models.Metrics, error) {
+	rs := s.Called(id, mtype)
+	if result := rs.Get(0); result != nil {
+		return result.(*models.Metrics), nil
+	} else {
+		return nil, nil
+	}
 }
 
-func (s *MockMetricStorage) GetAll() []models.Metrics {
+func (s *MockMetricStorage) GetAll() ([]models.Metrics, error) {
 	rs := s.Called()
-	return rs.Get(0).([]models.Metrics)
+	return rs.Get(0).([]models.Metrics), nil
 }
 
-func (s *MockMetricStorage) Update(m models.Metrics) {}
+func (s *MockMetricStorage) Update(m *models.Metrics) error { return nil }
+
+func (s *MockMetricStorage) Check() error                   { return nil }
+func (s *MockMetricStorage) Close()                         {}
+func (s *MockMetricStorage) Updates([]models.Metrics) error { return nil }
 
 func TestGetV2(t *testing.T) {
 	metricStorage := new(MockMetricStorage)
-	v := 1.0
-	storedMetric := models.Metrics{ID: "1", MType: "gauge", Value: &v}
-	handler := &Handler{getLogger(), metricStorage}
+	handler := &handler{getLogger(), metricStorage, ""}
 	tests := []struct {
 		name     string
 		code     int
 		body     []byte
-		response *models.Metrics
+		response *protocol.Metrics
 	}{
-		// {
-		// 	"200",
-		// 	200,
-		// 	func() []byte {
-		// 		r := &models.Metrics{ID: "1", MType: "gauge"}
-		// 		json, _ := json.Marshal(r)
-		// 		metricStorage.On("Get", r).Return(&storedMetric, true)
-		// 		return json
-		// 	}(),
-		// 	&storedMetric,
-		// },
+		{
+			"200",
+			200,
+			func() []byte {
+				r := protocol.Metrics{ID: "1", MType: "gauge"}
+				json, _ := json.Marshal(r)
+				v := 1.0
+				metricStorage.On("Get", "1", "gauge").Return(&models.Metrics{ID: "1", MType: "gauge", Value: &v}, true)
+				return json
+			}(),
+			func() *protocol.Metrics {
+				v := 1.0
+				return &protocol.Metrics{ID: "1", MType: "gauge", Value: &v}
+			}(),
+		},
 		{
 			"400",
 			400,
@@ -86,11 +88,11 @@ func TestGetV2(t *testing.T) {
 			h := http.HandlerFunc(handler.GetV2)
 			h.ServeHTTP(w, request)
 			res := w.Result()
-			var result models.Metrics
-			res.Body.Close()
+			var result protocol.Metrics
+			defer res.Body.Close()
 			if tt.response != nil {
 				json.NewDecoder(res.Body).Decode(&result)
-				assert.Equal(t, true, assert.ObjectsAreEqualValues(result, storedMetric), "wrong response")
+				assert.Equal(t, true, assert.ObjectsAreEqualValues(result, *tt.response), "wrong response")
 			}
 			assert.Equal(t, tt.code, res.StatusCode, "wrong status")
 		})
@@ -98,8 +100,8 @@ func TestGetV2(t *testing.T) {
 }
 
 func TestUpdateV2(t *testing.T) {
-	value := 1.0
-	handler := &Handler{getLogger(), new(MockMetricStorage)}
+	v := 1.0
+	handler := &handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
 		code int
@@ -109,7 +111,7 @@ func TestUpdateV2(t *testing.T) {
 			"200",
 			200,
 			func() []byte {
-				json, _ := json.Marshal(&models.Metrics{ID: "1", MType: "gauge", Value: &value})
+				json, _ := json.Marshal(&models.Metrics{ID: "1", MType: "gauge", Value: &v})
 				return json
 			}(),
 		},
@@ -136,7 +138,7 @@ func TestUpdateV2(t *testing.T) {
 }
 
 func TestUpdateV1(t *testing.T) {
-	handler := &Handler{getLogger(), new(MockMetricStorage)}
+	handler := &handler{getLogger(), new(MockMetricStorage), ""}
 	tests := []struct {
 		name string
 		code int
@@ -204,100 +206,97 @@ func TestUpdateV1(t *testing.T) {
 }
 
 func TestGetV1(t *testing.T) {
-	// gaugeType := "gauge"
-	// counterType := "counter"
-	// existMetricName := "existMetricName"
-	// ubsentMetricName := "ubsentMetricName"
-	// var i int64 = 1
-	// f := 1.1
-	// gaugeResponse := "1.1"
-	// counterResponse := "1"
-	// model := models.Metrics{ID: "1", MType: models.GAUGE, Value: &f, Delta: &i}
+	existMetricName := "existMetricName"
+	ubsentMetricName := "ubsentMetricName"
 	tests := []struct {
 		name          string
 		metricStorage storage.MetricsStorage
 		code          int
-		result        *string
+		result        string
 		rctx          *chi.Context
 	}{
-		// {
-		// 	"guage, 200 OK",
-		// 	func() storage.MetricsStorage {
-		// 		r := new(MockMetricStorage)
-		// 		r.On("Get", existMetricName).Return(model, true)
-		// 		return r
-		// 	}(),
-		// 	200,
-		// 	&gaugeResponse,
-		// 	func() *chi.Context {
-		// 		rctx := chi.NewRouteContext()
-		// 		rctx.URLParams.Add("type", gaugeType)
-		// 		rctx.URLParams.Add("name", existMetricName)
-		// 		return rctx
-		// 	}(),
-		// },
-		// {
-		// 	"guage, 404 Not Found",
-		// 	func() storage.MetricsStorage {
-		// 		r := new(MockMetricStorage)
-		// 		r.On("Get", ubsentMetricName).Return(model, false)
-		// 		return r
-		// 	}(),
-		// 	404,
-		// 	nil,
-		// 	func() *chi.Context {
-		// 		rctx := chi.NewRouteContext()
-		// 		rctx.URLParams.Add("type", gaugeType)
-		// 		rctx.URLParams.Add("name", ubsentMetricName)
-		// 		return rctx
-		// 	}(),
-		// },
+		{
+			"guage, 200 OK",
+			func() storage.MetricsStorage {
+				r := new(MockMetricStorage)
+				v := 1.0
+				model := models.Metrics{ID: "1", MType: models.GAUGE, Value: &v}
+				r.On("Get", existMetricName, models.GAUGE).Return(&model, true)
+				return r
+			}(),
+			200,
+			"1",
+			func() *chi.Context {
+				rctx := chi.NewRouteContext()
+				rctx.URLParams.Add("type", protocol.GAUGE)
+				rctx.URLParams.Add("name", existMetricName)
+				return rctx
+			}(),
+		},
+		{
+			"guage, 404 Not Found",
+			func() storage.MetricsStorage {
+				r := new(MockMetricStorage)
+				r.On("Get", ubsentMetricName, models.GAUGE).Return(nil, false)
+				return r
+			}(),
+			404,
+			"",
+			func() *chi.Context {
+				rctx := chi.NewRouteContext()
+				rctx.URLParams.Add("type", protocol.GAUGE)
+				rctx.URLParams.Add("name", ubsentMetricName)
+				return rctx
+			}(),
+		},
 		{
 			"guage, 400 Bad Request",
 			new(MockMetricStorage),
 			400,
-			nil,
+			"",
 			chi.NewRouteContext(),
 		},
-		// {
-		// 	"counter, 200 OK",
-		// 	func() storage.MetricsStorage {
-		// 		r := new(MockMetricStorage)
-		// 		r.On("Get", existMetricName).Return(model, true)
-		// 		return r
-		// 	}(),
-		// 	200,
-		// 	&counterResponse,
-		// 	func() *chi.Context {
-		// 		rctx := chi.NewRouteContext()
-		// 		rctx.URLParams.Add("type", counterType)
-		// 		rctx.URLParams.Add("name", existMetricName)
-		// 		return rctx
-		// 	}(),
-		// },
-		// {
-		// 	"counter, 404 Not Found",
-		// 	func() storage.MetricsStorage {
-		// 		r := new(MockMetricStorage)
-		// 		r.On("Get", ubsentMetricName).Return(model, false)
-		// 		return r
-		// 	}(),
-		// 	404,
-		// 	nil,
-		// 	func() *chi.Context {
-		// 		rctx := chi.NewRouteContext()
-		// 		rctx.URLParams.Add("type", counterType)
-		// 		rctx.URLParams.Add("name", ubsentMetricName)
-		// 		return rctx
-		// 	}(),
-		// },
+		{
+			"counter, 200 OK",
+			func() storage.MetricsStorage {
+				r := new(MockMetricStorage)
+				var d int64 = 1
+				model := models.Metrics{ID: "1", MType: models.COUNTER, Delta: &d}
+				r.On("Get", existMetricName, models.COUNTER).Return(&model, true)
+				return r
+			}(),
+			200,
+			"1",
+			func() *chi.Context {
+				rctx := chi.NewRouteContext()
+				rctx.URLParams.Add("type", protocol.COUNTER)
+				rctx.URLParams.Add("name", existMetricName)
+				return rctx
+			}(),
+		},
+		{
+			"counter, 404 Not Found",
+			func() storage.MetricsStorage {
+				r := new(MockMetricStorage)
+				r.On("Get", ubsentMetricName, models.COUNTER).Return(nil, false)
+				return r
+			}(),
+			404,
+			"",
+			func() *chi.Context {
+				rctx := chi.NewRouteContext()
+				rctx.URLParams.Add("type", protocol.COUNTER)
+				rctx.URLParams.Add("name", ubsentMetricName)
+				return rctx
+			}(),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", nil)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, tt.rctx))
 			w := httptest.NewRecorder()
-			handler := &Handler{getLogger(), tt.metricStorage}
+			handler := &handler{getLogger(), tt.metricStorage, ""}
 			h := http.HandlerFunc(handler.GetV1)
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -306,10 +305,10 @@ func TestGetV1(t *testing.T) {
 
 			assert.Equal(t, tt.code, res.StatusCode, "wrong status")
 
-			if tt.result != nil {
+			if tt.result != "" {
 				data, err := io.ReadAll(res.Body)
 				if assert.NoError(t, err) {
-					assert.Equal(t, *tt.result, string(data))
+					assert.Equal(t, tt.result, string(data))
 				}
 			}
 		})

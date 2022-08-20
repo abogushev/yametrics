@@ -7,8 +7,9 @@ import (
 	"net/http/httptest"
 	"runtime"
 	"testing"
-	"yametrics/internal/agent/models/api"
+	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
+	"yametrics/internal/protocol"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -73,7 +74,7 @@ func TestAgent_sendMetricsV2(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// Test request parameters
 		assert.Equal(t, req.Method, "POST")
-		var metric api.Metrics
+		var metric protocol.Metrics
 		err := json.NewDecoder(req.Body).Decode(&metric)
 		if assert.NoError(t, err) {
 			assert.Contains(t, apiModels, metric)
@@ -88,6 +89,7 @@ func TestAgent_sendMetricsV2(t *testing.T) {
 		client:  *server.Client(),
 		logger:  logger.Sugar(),
 		metrics: results,
+		config:  &config.AgentConfig{},
 	}
 	agent.sendMetricsV2()
 }

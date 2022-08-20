@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os/signal"
-	"sync"
 	"syscall"
 	"yametrics/internal/server"
 	"yametrics/internal/server/config"
@@ -14,29 +13,30 @@ import (
 )
 
 func main() {
-
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 
-	wg := new(sync.WaitGroup)
-
 	l, err := zap.NewProduction()
 	if err != nil {
-		log.Fatal("error on create logger", err)
+		log.Fatalf("error on create logger: %v", err)
 	}
 	logger := l.Sugar()
 	defer logger.Sync()
 
 	cfgProvider := config.NewConfigProvider()
 
-	logger.Infof("server conf: %v", cfgProvider.ServerCfg)
-	logger.Infof("storage conf: %v", cfgProvider.StorageCfg)
+	var metricstorage storage.MetricsStorage
 
-	var metricsStorage storage.MetricsStorage
-	if metricsStorage, err = storage.NewMetricsStorageImpl(cfgProvider.StorageCfg, logger, ctx, wg); err != nil {
-		logger.Fatal("error on create metric storage", err)
+	if len(cfgProvider.StorageCfg.DBURL) != 0 {
+		metricstorage, err = storage.NewDBMetricStorage(cfgProvider.StorageCfg.DBURL, ctx, logger)
+	} else {
+		metricstorage, err = storage.NewFileMetricsStorage(cfgProvider.StorageCfg, logger, ctx)
+	}
+	logger.Info("storage started successful")
+	if err != nil {
+		logger.Fatalf("error on create metric storage %v", err)
 	}
 
-	server.Run(logger, cfgProvider.ServerCfg, metricsStorage, ctx)
-	wg.Wait()
+	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx)
+	metricstorage.Close()
 }

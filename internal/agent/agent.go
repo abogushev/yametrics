@@ -12,28 +12,26 @@ import (
 
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
+	"yametrics/internal/protocol"
 
 	"go.uber.org/zap"
 )
 
 type Agent struct {
-	url            string
-	client         http.Client
-	logger         *zap.SugaredLogger
-	metrics        *storage.Metrics
-	reportInterval time.Duration
-	pollInterval   time.Duration
+	url     string
+	client  http.Client
+	logger  *zap.SugaredLogger
+	metrics *storage.Metrics
+	config  *config.AgentConfig
 }
 
 func NewAgent(l *zap.SugaredLogger, config *config.AgentConfig) *Agent {
-
 	return &Agent{
-		url:            "http://" + config.Address,
-		client:         http.Client{},
-		logger:         l,
-		metrics:        &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
-		reportInterval: config.ReportInterval,
-		pollInterval:   config.PollInterval,
+		url:     "http://" + config.Address,
+		client:  http.Client{},
+		logger:  l,
+		metrics: &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
+		config:  config,
 	}
 }
 
@@ -69,21 +67,40 @@ func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
 			agent.metrics.RandomValue = rand.Float64()
 		},
 		ctx,
-		agent.pollInterval,
+		agent.config.PollInterval,
 		"collecting metrics")
 }
 
 func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
-	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2() }, ctx, agent.reportInterval, "sending metrics")
+	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2(); agent.sendMultipleMetricsV2() }, ctx, agent.config.ReportInterval, "sending metrics")
+}
+
+func (agent *Agent) sendMultipleMetricsV2() {
+	apiMetrics := agent.metrics.ToAPI()
+	if json, err := json.Marshal(apiMetrics); err != nil {
+		agent.logger.Errorf("error on  Marshal metric: %w", err)
+	} else {
+		if r, err := agent.client.Post(fmt.Sprintf("%s/updates", agent.url), "application/json", bytes.NewBuffer(json)); err != nil {
+			agent.logger.Errorf("error in send metric: %w", err)
+		} else {
+			r.Body.Close()
+		}
+	}
 }
 
 func (agent *Agent) sendMetricsV2() {
-	apiMetrics := agent.metrics.ToAPI()
+	var apiMetrics []protocol.Metrics
+	if agent.config.SignKey != "" {
+		apiMetrics = agent.metrics.ToAPIWithSign(agent.config.SignKey)
+	} else {
+		apiMetrics = agent.metrics.ToAPI()
+	}
+
 	for i := 0; i < len(apiMetrics); i++ {
 		if json, err := json.Marshal(apiMetrics[i]); err != nil {
-			agent.logger.Errorf("error in Marshal metric: %s", err)
+			agent.logger.Errorf("error in Marshal metric: %w", err)
 		} else if r, err := agent.client.Post(fmt.Sprintf("%s/update", agent.url), "application/json", bytes.NewBuffer(json)); err != nil {
-			agent.logger.Errorf("error in send metric: %s", err)
+			agent.logger.Errorf("error in send metric: %w", err)
 		} else {
 			r.Body.Close()
 		}
@@ -93,7 +110,7 @@ func (agent *Agent) sendMetricsV2() {
 func (agent *Agent) sendMetricsV1() {
 	send := func(url string) {
 		if r, err := agent.client.Post(url, "text/plain", nil); err != nil {
-			agent.logger.Errorf("error in send metric: %s", err)
+			agent.logger.Errorf("error in send metric: %w", err)
 		} else {
 			r.Body.Close()
 		}

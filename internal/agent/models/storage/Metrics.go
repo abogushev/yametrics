@@ -2,7 +2,8 @@ package storage
 
 import (
 	"runtime"
-	"yametrics/internal/agent/models/api"
+	"yametrics/internal/metricscrypto"
+	"yametrics/internal/protocol"
 )
 
 type Metrics struct {
@@ -11,16 +12,24 @@ type Metrics struct {
 	RandomValue float64
 }
 
-func (m *Metrics) ToAPI() []api.Metrics {
-	result := make([]api.Metrics, 0)
+func (m *Metrics) ToAPI() []protocol.Metrics {
+	result := make([]protocol.Metrics, 0)
 	m.OperateOverMetricMaps(
 		func(s string, f float64) {
-			result = append(result, api.Metrics{ID: s, MType: api.GAUGE, Value: &f})
+			result = append(result, protocol.Metrics{ID: s, MType: protocol.GAUGE, Value: &f})
 		},
 		func(s string, i int64) {
-			result = append(result, api.Metrics{ID: s, MType: api.COUNTER, Delta: &i})
+			result = append(result, protocol.Metrics{ID: s, MType: protocol.COUNTER, Delta: &i})
 		},
 	)
+	return result
+}
+
+func (m *Metrics) ToAPIWithSign(key string) []protocol.Metrics {
+	result := m.ToAPI()
+	for i := 0; i < len(result); i++ {
+		result[i].Hash = metricscrypto.GetMetricSign(result[i], key)
+	}
 	return result
 }
 
