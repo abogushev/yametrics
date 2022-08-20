@@ -8,12 +8,15 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 	"yametrics/internal/protocol"
 
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/zap"
 )
 
@@ -36,11 +39,24 @@ func NewAgent(l *zap.SugaredLogger, config *config.AgentConfig) *Agent {
 }
 
 func (agent *Agent) RunSync(ctx context.Context) {
-	go agent.updateMetricsWithInterval(ctx)
-	go agent.sendMetricsWithInterval(ctx)
+	wg := &sync.WaitGroup{}
+
+	go agent.updateMetricsWithInterval(ctx, wg)
+	go agent.collectAdditional(ctx, wg)
+
+	go agent.sendMetricsWithInterval(ctx, wg)
+
 	agent.logger.Info("agent started")
-	<-ctx.Done()
+	wg.Wait()
 	agent.logger.Info("agent stoped")
+}
+
+func (agent *Agent) collectAdditional(ctx context.Context, wg *sync.WaitGroup) {
+	v, _ := mem.VirtualMemoryWithContext(ctx)
+	agent.metrics.TotalMemory = float64(v.Total)
+	agent.metrics.FreeMemory = float64(v.Free)
+	cpuUsage, _ := cpu.PercentWithContext(ctx, 0, false)
+	agent.metrics.CPUutilization1 = cpuUsage[0]
 }
 
 func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
@@ -59,7 +75,9 @@ func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Durati
 	}
 }
 
-func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
+func (agent *Agent) updateMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
 	agent.schedule(
 		func() {
 			runtime.ReadMemStats(agent.metrics.MemStats)
@@ -71,7 +89,9 @@ func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
 		"collecting metrics")
 }
 
-func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
+func (agent *Agent) sendMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
 	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2(); agent.sendMultipleMetricsV2() }, ctx, agent.config.ReportInterval, "sending metrics")
 }
 

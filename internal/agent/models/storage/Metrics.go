@@ -8,8 +8,11 @@ import (
 
 type Metrics struct {
 	*runtime.MemStats
-	PollCount   int64
-	RandomValue float64
+	PollCount       int64
+	RandomValue     float64
+	TotalMemory     float64
+	FreeMemory      float64
+	CPUutilization1 float64
 }
 
 func (m *Metrics) ToAPI() []protocol.Metrics {
