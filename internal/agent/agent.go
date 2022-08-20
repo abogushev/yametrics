@@ -52,11 +52,19 @@ func (agent *Agent) RunSync(ctx context.Context) {
 }
 
 func (agent *Agent) collectAdditional(ctx context.Context, wg *sync.WaitGroup) {
-	v, _ := mem.VirtualMemoryWithContext(ctx)
-	agent.metrics.TotalMemory = float64(v.Total)
-	agent.metrics.FreeMemory = float64(v.Free)
-	cpuUsage, _ := cpu.PercentWithContext(ctx, 0, false)
-	agent.metrics.CPUutilization1 = cpuUsage[0]
+	wg.Add(1)
+	defer wg.Done()
+	agent.schedule(
+		func() {
+			v, _ := mem.VirtualMemoryWithContext(ctx)
+			agent.metrics.TotalMemory = float64(v.Total)
+			agent.metrics.FreeMemory = float64(v.Free)
+			cpuUsage, _ := cpu.PercentWithContext(ctx, 0, false)
+			agent.metrics.CPUutilization1 = cpuUsage[0]
+		},
+		ctx,
+		agent.config.PollInterval,
+		"collecting additional metrics")
 }
 
 func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
