@@ -76,6 +76,9 @@ func (m *Metrics) MetricToMaps() (map[string]float64, map[string]int64) {
 	m2gauge["Sys"] = float64(m.Sys)
 	m2gauge["TotalAlloc"] = float64(m.TotalAlloc)
 	m2gauge["RandomValue"] = m.RandomValue
+	m2gauge["TotalMemory"] = m.TotalMemory
+	m2gauge["FreeMemory"] = m.FreeMemory
+	m2gauge["CPUutilization1"] = m.CPUutilization1
 
 	m2counter := make(map[string]int64)
 	m2counter["PollCount"] = m.PollCount
