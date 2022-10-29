@@ -64,9 +64,7 @@ func (m *metricManager) syncUpdates(ctx context.Context, wg *sync.WaitGroup) {
 				unicJob[w] = v
 			}
 			if len(unicJob) == 2 {
-				for mw := range unicJob {
-					delete(unicJob, mw)
-				}
+				unicJob = make(map[MetricWorker]struct{})
 				m.logger.Debug("sending updated metrics to channel")
 				m.NotifyCh <- *m.metrics
 			}
@@ -90,7 +88,10 @@ func (m *metricManager) updateAdditionalMetricsWithInterval(ctx context.Context,
 			v, _ := mem.VirtualMemoryWithContext(ctx)
 			m.metrics.TotalMemory = float64(v.Total)
 			m.metrics.FreeMemory = float64(v.Free)
-			cpuUsage, _ := cpu.PercentWithContext(ctx, 0, false)
+			cpuUsage, err := cpu.PercentWithContext(ctx, 0, false)
+			if err != nil {
+				m.logger.Errorf("err in updateAdditionalMetricsWithInterval %v", err)
+			}
 			m.metrics.CPUutilization1 = cpuUsage[0]
 
 			m.syncCh <- Additional
@@ -106,11 +107,12 @@ func (m *metricManager) updateMetricsWithInterval(ctx context.Context, wg *sync.
 	utils.Schedule(
 		func() {
 			m.syncWorkersMu.Lock()
-			defer m.syncWorkersMu.Unlock()
 
 			runtime.ReadMemStats(m.metrics.MemStats)
 			m.metrics.PollCount++
 			m.metrics.RandomValue = rand.Float64()
+
+			m.syncWorkersMu.Unlock()
 
 			m.syncCh <- General
 		},

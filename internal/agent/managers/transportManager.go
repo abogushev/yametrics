@@ -81,10 +81,10 @@ func (m *transportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 func (m *transportManager) sendMultipleMetricsV2() {
 	apiMetrics := m.metrics.ToAPI()
 	if json, err := json.Marshal(apiMetrics); err != nil {
-		m.logger.Errorf("error on  Marshal metric: %w", err)
+		m.logger.Errorf("error on  Marshal metric: %v", err)
 	} else {
 		if r, err := m.client.Post(fmt.Sprintf("%s/updates", m.url), "application/json", bytes.NewBuffer(json)); err != nil {
-			m.logger.Errorf("error in send metric: %w", err)
+			m.logger.Errorf("error in send metric: %v", err)
 		} else {
 			r.Body.Close()
 		}
@@ -101,9 +101,9 @@ func (m *transportManager) sendMetricsV2() {
 
 	for i := 0; i < len(apiMetrics); i++ {
 		if json, err := json.Marshal(apiMetrics[i]); err != nil {
-			m.logger.Errorf("error in Marshal metric: %w", err)
+			m.logger.Errorf("error in Marshal metric: %v", err)
 		} else if r, err := m.client.Post(fmt.Sprintf("%s/update", m.url), "application/json", bytes.NewBuffer(json)); err != nil {
-			m.logger.Errorf("error in send metric: %w", err)
+			m.logger.Errorf("error in send metric: %v", err)
 		} else {
 			r.Body.Close()
 		}
@@ -113,7 +113,7 @@ func (m *transportManager) sendMetricsV2() {
 func (m *transportManager) sendMetricsV1() {
 	send := func(url string) {
 		if r, err := m.client.Post(url, "text/plain", nil); err != nil {
-			m.logger.Errorf("error in send metric: %w", err)
+			m.logger.Errorf("error in send metric: %v", err)
 		} else {
 			r.Body.Close()
 		}
