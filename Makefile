@@ -19,6 +19,6 @@ server_trace_profile_and_save:
 	curl -sK -v 'http://localhost:8080/debug/pprof/profile?seconds=300' > profiles/server_profile.out && go tool pprof -http=":9090" profiles/server_profile.out
 
 server_trace_heap:
-        go tool pprof -http=":9090" -seconds=120 http://localhost:8080/debug/pprof/heap
+	go tool pprof -http=":9090" -seconds=120 http://localhost:8080/debug/pprof/heap
 server_trace_heap_and_save:
-        curl -sK -v 'http://localhost:8080/debug/pprof/heap?seconds=300' > profiles/server_heap.out && go tool pprof -http=":9090" profiles/server_heap.out
+	curl -sK -v 'http://localhost:8080/debug/pprof/heap?seconds=300' > profiles/server_heap.out && go tool pprof -http=":9090" profiles/server_heap.out
