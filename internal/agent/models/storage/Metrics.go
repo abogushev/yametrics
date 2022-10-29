@@ -45,9 +45,10 @@ func (m *Metrics) OperateOverMetricMaps(gaugeF func(string, float64), countersF 
 		countersF(k, v)
 	}
 }
-
+var m2gauge = make(map[string]float64)
+var m2counter = make(map[string]int64)
 func (m *Metrics) MetricToMaps() (map[string]float64, map[string]int64) {
-	m2gauge := make(map[string]float64)
+//	m2gauge := make(map[string]float64)
 	m2gauge["Alloc"] = float64(m.Alloc)
 	m2gauge["BuckHashSys"] = float64(m.BuckHashSys)
 	m2gauge["Frees"] = float64(m.Frees)
@@ -80,7 +81,7 @@ func (m *Metrics) MetricToMaps() (map[string]float64, map[string]int64) {
 	m2gauge["FreeMemory"] = m.FreeMemory
 	m2gauge["CPUutilization1"] = m.CPUutilization1
 
-	m2counter := make(map[string]int64)
+//	m2counter := make(map[string]int64)
 	m2counter["PollCount"] = m.PollCount
 
 	return m2gauge, m2counter
