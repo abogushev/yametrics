@@ -46,6 +46,9 @@ func TestAgent_sendMetricsV1(t *testing.T) {
 		"/update/gauge/TotalAlloc/0",
 		"/update/gauge/RandomValue/0",
 		"/update/counter/PollCount/0",
+		"/update/gauge/TotalMemory/0",
+		"/update/gauge/FreeMemory/0",
+		"/update/gauge/CPUutilization1/0",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {

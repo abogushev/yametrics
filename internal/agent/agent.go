@@ -8,12 +8,15 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 	"yametrics/internal/protocol"
 
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/zap"
 )
 
@@ -36,30 +39,34 @@ func NewAgent(l *zap.SugaredLogger, config *config.AgentConfig) *Agent {
 }
 
 func (agent *Agent) RunSync(ctx context.Context) {
-	go agent.updateMetricsWithInterval(ctx)
-	go agent.sendMetricsWithInterval(ctx)
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	go agent.updateMetricsWithInterval(ctx, wg)
+	go agent.collectAdditional(ctx, wg)
+	go agent.sendMetricsWithInterval(ctx, wg)
+
 	agent.logger.Info("agent started")
-	<-ctx.Done()
+	wg.Wait()
 	agent.logger.Info("agent stoped")
 }
 
-func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
-	ticker := time.NewTicker(duration)
-	for {
-		select {
-		case <-ticker.C:
-			agent.logger.Infof("call task: %s", name)
-			f()
-
-		case <-ctx.Done():
-			ticker.Stop()
-			agent.logger.Infof("cancel task: %s", name)
-			return
-		}
-	}
+func (agent *Agent) collectAdditional(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	agent.schedule(
+		func() {
+			v, _ := mem.VirtualMemoryWithContext(ctx)
+			agent.metrics.TotalMemory = float64(v.Total)
+			agent.metrics.FreeMemory = float64(v.Free)
+			cpuUsage, _ := cpu.PercentWithContext(ctx, 0, false)
+			agent.metrics.CPUutilization1 = cpuUsage[0]
+		},
+		ctx,
+		agent.config.PollInterval,
+		"collecting additional metrics")
 }
 
-func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
+func (agent *Agent) updateMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	agent.schedule(
 		func() {
 			runtime.ReadMemStats(agent.metrics.MemStats)
@@ -71,7 +78,8 @@ func (agent *Agent) updateMetricsWithInterval(ctx context.Context) {
 		"collecting metrics")
 }
 
-func (agent *Agent) sendMetricsWithInterval(ctx context.Context) {
+func (agent *Agent) sendMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	agent.schedule(func() { agent.sendMetricsV1(); agent.sendMetricsV2(); agent.sendMultipleMetricsV2() }, ctx, agent.config.ReportInterval, "sending metrics")
 }
 
@@ -124,4 +132,20 @@ func (agent *Agent) sendMetricsV1() {
 			send(fmt.Sprintf("%s/update/counter/%s/%v", agent.url, key, v))
 		},
 	)
+}
+
+func (agent *Agent) schedule(f func(), ctx context.Context, duration time.Duration, name string) {
+	ticker := time.NewTicker(duration)
+	for {
+		select {
+		case <-ticker.C:
+			agent.logger.Infof("call task: %s", name)
+			f()
+
+		case <-ctx.Done():
+			ticker.Stop()
+			agent.logger.Infof("cancel task: %s", name)
+			return
+		}
+	}
 }
