@@ -8,7 +8,7 @@ import (
 	"yametrics/internal/server"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/storage"
-
+	_ "net/http/pprof" 
 	"go.uber.org/zap"
 )
 

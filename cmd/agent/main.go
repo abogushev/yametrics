@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os/signal"
 	"sync"
 	"syscall"
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/managers"
-
+	_ "net/http/pprof"
 	"go.uber.org/zap"
 )
 
@@ -28,6 +29,13 @@ func main() {
 
 	m.RunAsync(ctx, wg)
 	t.RunAsync(m.NotifyCh, ctx, wg)
+
+	go func() {
+		if err := http.ListenAndServe(":8100", nil); err != nil {
+			logger.Fatalf("can't start metric server, %v", err)
+		}
+	}()
+
 
 	wg.Wait()
 }

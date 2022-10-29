@@ -52,15 +52,15 @@ func Run(
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			logger.Fatalf("server start error: %w", err)
+			logger.Fatalf("server start error: %v", err)
 		}
 	}()
-	logger.Info("server started successfuly")
+	logger.Infof("server started successfuly, addr:%v", server.Addr)
 
 	<-ctx.Done()
 	logger.Info("get stop signal, start shutdown server")
 	if err := server.Shutdown(ctx); err != nil && errors.Is(err, context.Canceled) {
-		logger.Fatalf("Server Shutdown Failed:%w", err)
+		logger.Fatalf("Server Shutdown Failed:%v", err)
 	} else {
 		logger.Info("server stopped successfully")
 	}
