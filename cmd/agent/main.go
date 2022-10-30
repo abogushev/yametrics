@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"net/http"
+	_ "net/http/pprof"
 	"os/signal"
 	"sync"
 	"syscall"
+
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/managers"
-	_ "net/http/pprof"
+
 	"go.uber.org/zap"
 )
 
@@ -35,7 +37,6 @@ func main() {
 			logger.Fatalf("can't start metric server, %v", err)
 		}
 	}()
-
 
 	wg.Wait()
 }
