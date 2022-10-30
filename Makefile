@@ -28,3 +28,7 @@ server_trace_heap:
 	$(call trace_fn,$(server_agent_port),heap)
 server_trace_heap_and_save:
 	$(call trace_and_save_fn,$(server_agent_port),heap,server_heap.out)
+
+run_doc:
+	(sleep 2; open "http://localhost:6060/pkg/?m=all")&
+	~/go/bin/godoc  -http=localhost:6060 -goroot=. -play

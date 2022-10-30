@@ -37,7 +37,7 @@ const (
 	getSQL    = `select id, mtype, delta, value from metrics where id = $1 and mtype = $2`
 	getAllSQL = `select id, mtype, delta, value from metrics`
 )
-
+//dbMetricStorage - сервис по работе с бд
 type dbMetricStorage struct {
 	url    string
 	ctx    context.Context
