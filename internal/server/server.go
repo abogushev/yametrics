@@ -7,7 +7,7 @@ import (
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
 	"yametrics/internal/server/storage"
-
+	_ "net/http/pprof"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
@@ -48,6 +48,8 @@ func Run(
 		r.Get("/", handler.GetAllAsHTML)
 	})
 
+	runProfileServer(logger)
+
 	server := &http.Server{Addr: cfg.Address, Handler: r}
 
 	go func() {
@@ -64,4 +66,12 @@ func Run(
 	} else {
 		logger.Info("server stopped successfully")
 	}
+}
+
+func runProfileServer(logger *zap.SugaredLogger) {
+	go func() {
+		if err := http.ListenAndServe(":8200", nil); err != nil {
+			logger.Fatalf("can't start metric server, %v", err)
+		}
+	}()
 }
