@@ -22,15 +22,16 @@ const (
 )
 
 type metricManager struct {
-	logger        *zap.SugaredLogger
-	metrics       *storage.Metrics
-	config        *config.AgentConfig
-	syncCh        chan MetricWorker
+	logger  *zap.SugaredLogger
+	metrics *storage.Metrics
+	config  *config.AgentConfig
+	syncCh  chan MetricWorker
 	// NotifyCh - в этот канал будут отдаваться собранные данные.
 	NotifyCh      chan storage.Metrics
 	syncWorkersMu sync.Mutex
 	once          sync.Once
 }
+
 // NewMetricManager - создание менеджера сбора метрик.
 //
 // для запуска менеждера необходимо вызвать RunAsync.
@@ -46,7 +47,8 @@ func NewMetricManager(
 		NotifyCh: make(chan storage.Metrics),
 	}
 }
-//RunAsync - запуск менеджера: стартуют рутины по сбору и отправке метрик
+
+// RunAsync - запуск менеджера: стартуют рутины по сбору и отправке метрик
 func (m *metricManager) RunAsync(ctx context.Context, wg *sync.WaitGroup) {
 	m.once.Do(func() {
 		wg.Add(3)
@@ -55,7 +57,8 @@ func (m *metricManager) RunAsync(ctx context.Context, wg *sync.WaitGroup) {
 		go m.syncUpdates(ctx, wg)
 	})
 }
-//метод для синхронизации джоб по сбору метрик.
+
+// метод для синхронизации джоб по сбору метрик.
 func (m *metricManager) syncUpdates(ctx context.Context, wg *sync.WaitGroup) {
 	unicJob := make(map[MetricWorker]struct{})
 

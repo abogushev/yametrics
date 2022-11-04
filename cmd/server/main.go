@@ -13,7 +13,8 @@ import (
 
 	"go.uber.org/zap"
 )
-//запуск сервера: инициализация хранилища и сервера
+
+// запуск сервера: инициализация хранилища и сервера
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()

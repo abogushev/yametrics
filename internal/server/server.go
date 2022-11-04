@@ -13,7 +13,8 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
 )
-//Run - запуск сервера
+
+// Run - запуск сервера
 func Run(
 	logger *zap.SugaredLogger,
 	cfg *config.ServerConfig,

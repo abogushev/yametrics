@@ -16,6 +16,7 @@ import (
 
 	"go.uber.org/zap"
 )
+
 // менеджер отправки данных на сервер
 type transportManager struct {
 	url     string
@@ -26,9 +27,10 @@ type transportManager struct {
 	rwMutex sync.RWMutex
 	once    sync.Once
 }
+
 // NewTransportManager - создание менеджера отправки метрик.
 //
-//для запуска менеждера необходимо вызвать RunAsync.
+// для запуска менеждера необходимо вызвать RunAsync.
 func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig) *transportManager {
 	return &transportManager{
 		url:     "http://" + config.Address,
@@ -38,8 +40,9 @@ func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig) *tran
 		config:  config,
 	}
 }
-//RunAsync - запуск менеджера: обновленные данные будут приходить из notifyCh канала
-//здесь стартуют рутины по прослушиванию обновленных данных и по отправке данных на сервер
+
+// RunAsync - запуск менеджера: обновленные данные будут приходить из notifyCh канала
+// здесь стартуют рутины по прослушиванию обновленных данных и по отправке данных на сервер
 func (m *transportManager) RunAsync(notifyCh <-chan storage.Metrics, ctx context.Context, wg *sync.WaitGroup) {
 	m.once.Do(func() {
 		wg.Add(2)
