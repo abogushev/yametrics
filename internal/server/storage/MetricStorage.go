@@ -5,6 +5,7 @@ import (
 	"yametrics/internal/server/models"
 )
 
+// MetricsStorage - интерфейс для абстрагирования работ с хранилищем
 type MetricsStorage interface {
 	Get(id string, mtype string) (*models.Metrics, error)
 	GetAll() ([]models.Metrics, error)

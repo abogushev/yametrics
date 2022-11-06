@@ -149,6 +149,7 @@ func (h *handler) GetV1(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetAllAsHTML - отображение всех метрик в html вормате
 func (h *handler) GetAllAsHTML(w http.ResponseWriter, r *http.Request) {
 	if storageMetrics, err := h.metricsStorage.GetAll(); err != nil {
 		h.logger.Errorf("error on GetAllAsHTML: %w", err)

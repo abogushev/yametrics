@@ -13,6 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// fileMetricsStorage - файловое хранилище метрик
+// умеет периодически сохранять даные в файл и вычитывает его при старте
 type fileMetricsStorage struct {
 	mutex   sync.Mutex
 	metrics map[string]*models.Metrics

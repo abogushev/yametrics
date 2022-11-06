@@ -1,16 +1,21 @@
+// Агент сбора метрик
 package main
 
 import (
 	"context"
+	"net/http"
+	_ "net/http/pprof"
 	"os/signal"
 	"sync"
 	"syscall"
+
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/managers"
 
 	"go.uber.org/zap"
 )
 
+// при старте запускаются два фоновых демона для сбора и отправки метрик на сервер с предопределенными конфигами.
 func main() {
 	l, _ := zap.NewProduction()
 	logger := l.Sugar()
@@ -28,6 +33,12 @@ func main() {
 
 	m.RunAsync(ctx, wg)
 	t.RunAsync(m.NotifyCh, ctx, wg)
+
+	go func() {
+		if err := http.ListenAndServe(":8100", nil); err != nil {
+			logger.Fatalf("can't start metric server, %v", err)
+		}
+	}()
 
 	wg.Wait()
 }

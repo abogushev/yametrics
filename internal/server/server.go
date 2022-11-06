@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	_ "net/http/pprof"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
 	"yametrics/internal/server/storage"
@@ -13,6 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Run - запуск сервера
 func Run(
 	logger *zap.SugaredLogger,
 	cfg *config.ServerConfig,
@@ -48,20 +50,30 @@ func Run(
 		r.Get("/", handler.GetAllAsHTML)
 	})
 
+	runProfileServer(logger)
+
 	server := &http.Server{Addr: cfg.Address, Handler: r}
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			logger.Fatalf("server start error: %w", err)
+			logger.Fatalf("server start error: %v", err)
 		}
 	}()
-	logger.Info("server started successfuly")
+	logger.Infof("server started successfuly, addr:%v", server.Addr)
 
 	<-ctx.Done()
 	logger.Info("get stop signal, start shutdown server")
 	if err := server.Shutdown(ctx); err != nil && errors.Is(err, context.Canceled) {
-		logger.Fatalf("Server Shutdown Failed:%w", err)
+		logger.Fatalf("Server Shutdown Failed:%v", err)
 	} else {
 		logger.Info("server stopped successfully")
 	}
+}
+
+func runProfileServer(logger *zap.SugaredLogger) {
+	go func() {
+		if err := http.ListenAndServe(":8200", nil); err != nil {
+			logger.Fatalf("can't start metric server, %v", err)
+		}
+	}()
 }

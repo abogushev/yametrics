@@ -21,30 +21,35 @@ const (
 	Additional
 )
 
-type metricManager struct {
-	logger        *zap.SugaredLogger
-	metrics       *storage.Metrics
-	config        *config.AgentConfig
-	syncCh        chan MetricWorker
+type MetricManager struct {
+	logger  *zap.SugaredLogger
+	metrics *storage.Metrics
+	config  *config.AgentConfig
+	syncCh  chan MetricWorker
+	// NotifyCh - в этот канал будут отдаваться собранные данные.
 	NotifyCh      chan storage.Metrics
 	syncWorkersMu sync.Mutex
 	once          sync.Once
 }
 
+// NewMetricManager - создание менеджера сбора метрик.
+//
+// для запуска менеждера необходимо вызвать RunAsync.
 func NewMetricManager(
 	logger *zap.SugaredLogger,
-	config *config.AgentConfig) *metricManager {
+	config *config.AgentConfig) *MetricManager {
 
-	return &metricManager{
+	return &MetricManager{
 		logger:   logger,
-		metrics:  &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
+		metrics:  storage.NewMetrics(),
 		config:   config,
 		syncCh:   make(chan MetricWorker),
 		NotifyCh: make(chan storage.Metrics),
 	}
 }
 
-func (m *metricManager) RunAsync(ctx context.Context, wg *sync.WaitGroup) {
+// RunAsync - запуск менеджера: стартуют рутины по сбору и отправке метрик
+func (m *MetricManager) RunAsync(ctx context.Context, wg *sync.WaitGroup) {
 	m.once.Do(func() {
 		wg.Add(3)
 		go m.updateMetricsWithInterval(ctx, wg)
@@ -53,7 +58,8 @@ func (m *metricManager) RunAsync(ctx context.Context, wg *sync.WaitGroup) {
 	})
 }
 
-func (m *metricManager) syncUpdates(ctx context.Context, wg *sync.WaitGroup) {
+// метод для синхронизации джоб по сбору метрик.
+func (m *MetricManager) syncUpdates(ctx context.Context, wg *sync.WaitGroup) {
 	unicJob := make(map[MetricWorker]struct{})
 
 	for {
@@ -78,7 +84,7 @@ func (m *metricManager) syncUpdates(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (m *metricManager) updateAdditionalMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+func (m *MetricManager) updateAdditionalMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	utils.Schedule(
 		func() {
@@ -102,7 +108,7 @@ func (m *metricManager) updateAdditionalMetricsWithInterval(ctx context.Context,
 		m.logger)
 }
 
-func (m *metricManager) updateMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+func (m *MetricManager) updateMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	utils.Schedule(
 		func() {
