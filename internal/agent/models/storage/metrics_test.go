@@ -1,11 +1,10 @@
 package storage
 
 import (
-	"runtime"
 	"testing"
 )
 
-var M = &Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0}
+var M = NewMetrics()
 
 func BenchmarkMetricToMap(b *testing.B) {
 	b.Run("current", func(b *testing.B) {

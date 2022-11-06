@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"runtime"
 	"sync"
 
 	"yametrics/internal/agent/config"
@@ -18,7 +17,7 @@ import (
 )
 
 // менеджер отправки данных на сервер
-type transportManager struct {
+type TransportManager struct {
 	url     string
 	client  http.Client
 	logger  *zap.SugaredLogger
@@ -31,19 +30,19 @@ type transportManager struct {
 // NewTransportManager - создание менеджера отправки метрик.
 //
 // для запуска менеждера необходимо вызвать RunAsync.
-func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig) *transportManager {
-	return &transportManager{
+func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig) *TransportManager {
+	return &TransportManager{
 		url:     "http://" + config.Address,
 		client:  http.Client{},
 		logger:  l,
-		metrics: &storage.Metrics{MemStats: &runtime.MemStats{}, PollCount: 0, RandomValue: 0.0},
+		metrics: storage.NewMetrics(),
 		config:  config,
 	}
 }
 
 // RunAsync - запуск менеджера: обновленные данные будут приходить из notifyCh канала
 // здесь стартуют рутины по прослушиванию обновленных данных и по отправке данных на сервер
-func (m *transportManager) RunAsync(notifyCh <-chan storage.Metrics, ctx context.Context, wg *sync.WaitGroup) {
+func (m *TransportManager) RunAsync(notifyCh <-chan storage.Metrics, ctx context.Context, wg *sync.WaitGroup) {
 	m.once.Do(func() {
 		wg.Add(2)
 		go m.sendMetricsWithInterval(ctx, wg)
@@ -51,7 +50,7 @@ func (m *transportManager) RunAsync(notifyCh <-chan storage.Metrics, ctx context
 	})
 }
 
-func (m *transportManager) subscribeOnUpdates(notifyCh <-chan storage.Metrics, ctx context.Context, wg *sync.WaitGroup) {
+func (m *TransportManager) subscribeOnUpdates(notifyCh <-chan storage.Metrics, ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case updated := <-notifyCh:
@@ -68,7 +67,7 @@ func (m *transportManager) subscribeOnUpdates(notifyCh <-chan storage.Metrics, c
 	}
 }
 
-func (m *transportManager) sendMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
+func (m *TransportManager) sendMetricsWithInterval(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	utils.Schedule(func() {
 		m.rwMutex.RLock()
@@ -83,20 +82,22 @@ func (m *transportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 		"sending metrics",
 		m.logger)
 }
-func (m *transportManager) sendMultipleMetricsV2() {
+func (m *TransportManager) sendMultipleMetricsV2() {
 	apiMetrics := m.metrics.ToAPI()
-	if json, err := json.Marshal(apiMetrics); err != nil {
+	if marshal, err := json.Marshal(apiMetrics); err != nil {
 		m.logger.Errorf("error on  Marshal metric: %v", err)
 	} else {
-		if r, err := m.client.Post(fmt.Sprintf("%s/updates", m.url), "application/json", bytes.NewBuffer(json)); err != nil {
+		if r, err := m.client.Post(fmt.Sprintf("%s/updates", m.url), "application/json", bytes.NewBuffer(marshal)); err != nil {
 			m.logger.Errorf("error in send metric: %v", err)
 		} else {
-			r.Body.Close()
+			if err := r.Body.Close(); err != nil {
+				m.logger.Errorf("error in close body %v", err)
+			}
 		}
 	}
 }
 
-func (m *transportManager) sendMetricsV2() {
+func (m *TransportManager) sendMetricsV2() {
 	var apiMetrics []protocol.Metrics
 	if m.config.SignKey != "" {
 		apiMetrics = m.metrics.ToAPIWithSign(m.config.SignKey)
@@ -105,22 +106,26 @@ func (m *transportManager) sendMetricsV2() {
 	}
 
 	for i := 0; i < len(apiMetrics); i++ {
-		if json, err := json.Marshal(apiMetrics[i]); err != nil {
+		if marshal, err := json.Marshal(apiMetrics[i]); err != nil {
 			m.logger.Errorf("error in Marshal metric: %v", err)
-		} else if r, err := m.client.Post(fmt.Sprintf("%s/update", m.url), "application/json", bytes.NewBuffer(json)); err != nil {
+		} else if r, err := m.client.Post(fmt.Sprintf("%s/update", m.url), "application/json", bytes.NewBuffer(marshal)); err != nil {
 			m.logger.Errorf("error in send metric: %v", err)
 		} else {
-			r.Body.Close()
+			if err := r.Body.Close(); err != nil {
+				m.logger.Errorf("error in close body %v", err)
+			}
 		}
 	}
 }
 
-func (m *transportManager) sendMetricsV1() {
+func (m *TransportManager) sendMetricsV1() {
 	send := func(url string) {
 		if r, err := m.client.Post(url, "text/plain", nil); err != nil {
 			m.logger.Errorf("error in send metric: %v", err)
 		} else {
-			r.Body.Close()
+			if err := r.Body.Close(); err != nil {
+				m.logger.Errorf("error in close body %v", err)
+			}
 		}
 	}
 
