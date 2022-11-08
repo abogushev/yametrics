@@ -32,3 +32,6 @@ server_trace_heap_and_save:
 run_doc:
 	(sleep 2; open "http://localhost:6060/pkg/?m=all")&
 	~/go/bin/godoc  -http=localhost:6060 -goroot=. -play
+
+run_lint:
+	go run ./multichecker.go /Users/a.bogushev/course/yametrics/...
