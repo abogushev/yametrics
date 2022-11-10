@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"yametrics/internal/metainfo"
 
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/managers"
@@ -15,8 +16,16 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 // при старте запускаются два фоновых демона для сбора и отправки метрик на сервер с предопределенными конфигами.
 func main() {
+	metainfo.PrintBuildInfo(buildVersion, buildDate, buildCommit)
+
 	l, _ := zap.NewProduction()
 	logger := l.Sugar()
 	defer logger.Sync()

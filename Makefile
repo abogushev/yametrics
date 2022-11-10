@@ -7,7 +7,8 @@ trace_fn = go tool pprof -http=\":9090\" -seconds=120 http://localhost:$(1)/debu
 trace_and_save_fn = curl -sK -v http://localhost:$(1)/debug/pprof/$(2)?seconds=300 > profiles/$(3) && go tool pprof -http=":9090" profiles/$(3)
 
 client_run:
-	go run cmd/agent/main.go
+	# go run cmd/agent/main.go
+	go run -ldflags "-X main.buildVersion=$$(cat cmd/agent/version.txt) -X 'main.buildDate=$$(date +'%d/%m/%Y')' -X 'main.buildCommit=$$(git rev-parse HEAD)'" cmd/agent/main.go
 client_trace_profile:
 	$(call trace_fn,$(client_agent_port),profile)
 client_trace_profile_and_save:
@@ -19,7 +20,8 @@ client_trace_heap_and_save:
 
 
 server_run:
-	go run cmd/server/main.go
+	# go run cmd/server/main.go
+	go run -ldflags "-X main.buildVersion=$$(cat cmd/server/version.txt) -X 'main.buildDate=$$(date +'%d/%m/%Y')' -X 'main.buildCommit=$$(git rev-parse HEAD)'" cmd/server/main.go
 server_trace_profile:
 	$(call trace_fn,$(server_agent_port),profile)
 server_trace_profile_and_save:
