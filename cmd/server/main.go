@@ -7,12 +7,13 @@ import (
 	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
+
+	"go.uber.org/zap"
+
 	"yametrics/internal/metainfo"
 	"yametrics/internal/server"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/storage"
-
-	"go.uber.org/zap"
 )
 
 var (

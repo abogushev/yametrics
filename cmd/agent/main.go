@@ -8,12 +8,12 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"yametrics/internal/metainfo"
+
+	"go.uber.org/zap"
 
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/managers"
-
-	"go.uber.org/zap"
+	"yametrics/internal/metainfo"
 )
 
 var (

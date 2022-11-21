@@ -61,22 +61,34 @@ var OSExitCheckAnalyzer = &analysis.Analyzer{
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
-			if file.Name.Name == "main" {
-				if fun, ok := node.(*ast.FuncDecl); ok {
-					if fun.Name.Name == "main" {
-						for _, stmt := range fun.Body.List {
-							if exprStmt, ok := stmt.(*ast.ExprStmt); ok {
-								if f, ok := exprStmt.X.(*ast.CallExpr); ok {
-									if ff, ok := f.Fun.(*ast.SelectorExpr); ok && ff.Sel.Name == "Exit" {
-										if ident, ok := ff.X.(*ast.Ident); ok && ident.Name == "os" {
-											pass.Reportf(file.Pos(), "calling os.Exist is unwanted")
-										}
-									}
-								}
-							}
-						}
-					}
+			if file.Name.Name != "main" {
+				return true
+			}
+			fun, ok := node.(*ast.FuncDecl)
+			if !ok {
+				return true
+			}
+			if fun.Name.Name != "main" {
+				return true
+			}
+			for _, stmt := range fun.Body.List {
+				exprStmt, ok := stmt.(*ast.ExprStmt)
+				if !ok {
+					continue
 				}
+				f, ok := exprStmt.X.(*ast.CallExpr)
+				if !ok {
+					continue
+				}
+				ff, ok := f.Fun.(*ast.SelectorExpr)
+				if !(ok && ff.Sel.Name == "Exit") {
+					continue
+				}
+				ident, ok := ff.X.(*ast.Ident)
+				if !(ok && ident.Name == "os") {
+					continue
+				}
+				pass.Reportf(file.Pos(), "calling os.Exist is unwanted")
 			}
 			return true
 		})
