@@ -7,15 +7,25 @@ import (
 	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
+
+	"go.uber.org/zap"
+
+	"yametrics/internal/metainfo"
 	"yametrics/internal/server"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/storage"
+)
 
-	"go.uber.org/zap"
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 // запуск сервера: инициализация хранилища и сервера
 func main() {
+	metainfo.PrintBuildInfo(buildVersion, buildDate, buildCommit)
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 

@@ -113,8 +113,8 @@ func (db *dbMetricStorage) Updates(mtrcs []models.Metrics) error {
 
 	for i := 0; i < len(mtrcs); i++ {
 		if _, err := upInsertStmt.ExecContext(db.ctx, &mtrcs[i]); err != nil {
-			if err := tx.Rollback(); err != nil {
-				return err
+			if txErr := tx.Rollback(); txErr != nil {
+				return txErr
 			}
 			return err
 		}

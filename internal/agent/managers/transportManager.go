@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// менеджер отправки данных на сервер
+// TransportManager менеджер отправки данных на сервер
 type TransportManager struct {
 	url     string
 	client  http.Client
@@ -28,7 +28,6 @@ type TransportManager struct {
 }
 
 // NewTransportManager - создание менеджера отправки метрик.
-//
 // для запуска менеждера необходимо вызвать RunAsync.
 func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig) *TransportManager {
 	return &TransportManager{
