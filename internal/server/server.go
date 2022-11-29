@@ -1,10 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"crypto/rsa"
 	"errors"
+	"io"
 	"net/http"
 	_ "net/http/pprof"
+	"yametrics/internal/crypto"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
 	"yametrics/internal/server/storage"
@@ -19,7 +23,8 @@ func Run(
 	logger *zap.SugaredLogger,
 	cfg *config.ServerConfig,
 	storage storage.MetricsStorage,
-	ctx context.Context) {
+	ctx context.Context,
+	privateKey *rsa.PrivateKey) {
 	handler := handlers.NewHandler(logger, storage, cfg.SignKey)
 
 	r := chi.NewRouter()
@@ -38,6 +43,25 @@ func Run(
 
 	r.Route("/updates", func(r chi.Router) {
 		r.Post("/", handler.UpdatesV2)
+	})
+
+	r.Route("/update_enc", func(r chi.Router) {
+		r.Post("/", func(writer http.ResponseWriter, request *http.Request) {
+			encbody, err := io.ReadAll(request.Body)
+			if err != nil {
+				logger.Errorf("failed to read encrypted msg, %v", err)
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			body, err := crypto.Decrypt(privateKey, encbody)
+			if err != nil {
+				logger.Errorf("failed to deccrypte msg, %v", err)
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			request.Body = io.NopCloser(bytes.NewReader(body))
+			handler.UpdateV2(writer, request)
+		})
 	})
 
 	r.Route("/value", func(r chi.Router) {

@@ -11,6 +11,7 @@ type AgentConfig struct {
 	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
 	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
 	SignKey        string        `env:"KEY"`
+	CryptoKeyPath  string        `env:"CRYPTO_KEY"`
 }
 
 func (cfg *AgentConfig) DefineFlags() {
@@ -18,6 +19,7 @@ func (cfg *AgentConfig) DefineFlags() {
 	flag.DurationVar(&cfg.ReportInterval, "r", time.Second*10, "report interval")
 	flag.DurationVar(&cfg.PollInterval, "p", time.Second*2, "poll interval")
 	flag.StringVar(&cfg.SignKey, "k", "", "sign key")
+	flag.StringVar(&cfg.CryptoKeyPath, "crypto-key", "public_key.pem", "path to public key")
 }
 
 func (cfg *AgentConfig) LoadFromEnv() {
@@ -30,4 +32,5 @@ func (cfg *AgentConfig) LoadFromEnv() {
 	setIfDefined("REPORT_INTERVAL", func(v string) { cfg.ReportInterval, _ = time.ParseDuration(v) })
 	setIfDefined("POLL_INTERVAL", func(v string) { cfg.PollInterval, _ = time.ParseDuration(v) })
 	setIfDefined("KEY", func(v string) { cfg.SignKey = v })
+	setIfDefined("CRYPTO_KEY", func(v string) { cfg.CryptoKeyPath = v })
 }

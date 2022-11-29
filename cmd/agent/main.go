@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"yametrics/internal/crypto"
 
 	"go.uber.org/zap"
 
@@ -37,8 +38,13 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 
+	publicKey, err := crypto.ReadPublicKey(configProvider.AgentCfg.CryptoKeyPath)
+	if err != nil {
+		logger.Fatalf("init failed %v", err)
+	}
+
 	m := managers.NewMetricManager(logger, configProvider.AgentCfg)
-	t := managers.NewTransportManager(logger, configProvider.AgentCfg)
+	t := managers.NewTransportManager(logger, configProvider.AgentCfg, publicKey)
 
 	m.RunAsync(ctx, wg)
 	t.RunAsync(m.NotifyCh, ctx, wg)

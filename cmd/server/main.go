@@ -7,6 +7,7 @@ import (
 	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
+	"yametrics/internal/crypto"
 
 	"go.uber.org/zap"
 
@@ -50,6 +51,11 @@ func main() {
 		logger.Fatalf("error on create metric storage %v", err)
 	}
 
-	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx)
+	privateKey, err := crypto.ReadPrivateKey(cfgProvider.ServerCfg.CryptoKeyPath)
+	if err != nil {
+		logger.Fatalf("error on read private key, %v", err)
+	}
+
+	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx, privateKey)
 	metricstorage.Close()
 }

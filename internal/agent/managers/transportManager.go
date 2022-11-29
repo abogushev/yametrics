@@ -3,14 +3,15 @@ package managers
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
-
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 	"yametrics/internal/agent/utils"
+	"yametrics/internal/crypto"
 	"yametrics/internal/protocol"
 
 	"go.uber.org/zap"
@@ -18,24 +19,26 @@ import (
 
 // TransportManager менеджер отправки данных на сервер
 type TransportManager struct {
-	url     string
-	client  http.Client
-	logger  *zap.SugaredLogger
-	config  *config.AgentConfig
-	metrics *storage.Metrics
-	rwMutex sync.RWMutex
-	once    sync.Once
+	url       string
+	client    http.Client
+	logger    *zap.SugaredLogger
+	config    *config.AgentConfig
+	metrics   *storage.Metrics
+	rwMutex   sync.RWMutex
+	once      sync.Once
+	publicKey *rsa.PublicKey
 }
 
 // NewTransportManager - создание менеджера отправки метрик.
 // для запуска менеждера необходимо вызвать RunAsync.
-func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig) *TransportManager {
+func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig, pubKey *rsa.PublicKey) *TransportManager {
 	return &TransportManager{
-		url:     "http://" + config.Address,
-		client:  http.Client{},
-		logger:  l,
-		metrics: storage.NewMetrics(),
-		config:  config,
+		url:       "http://" + config.Address,
+		client:    http.Client{},
+		logger:    l,
+		metrics:   storage.NewMetrics(),
+		config:    config,
+		publicKey: pubKey,
 	}
 }
 
@@ -75,12 +78,14 @@ func (m *TransportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 		m.sendMetricsV1()
 		m.sendMetricsV2()
 		m.sendMultipleMetricsV2()
+		m.sendMultipleMetricsV2Encrypted()
 	},
 		ctx,
 		m.config.ReportInterval,
 		"sending metrics",
 		m.logger)
 }
+
 func (m *TransportManager) sendMultipleMetricsV2() {
 	apiMetrics := m.metrics.ToAPI()
 	if marshal, err := json.Marshal(apiMetrics); err != nil {
@@ -108,6 +113,29 @@ func (m *TransportManager) sendMetricsV2() {
 		if marshal, err := json.Marshal(apiMetrics[i]); err != nil {
 			m.logger.Errorf("error in Marshal metric: %v", err)
 		} else if r, err := m.client.Post(fmt.Sprintf("%s/update", m.url), "application/json", bytes.NewBuffer(marshal)); err != nil {
+			m.logger.Errorf("error in send metric: %v", err)
+		} else {
+			if err := r.Body.Close(); err != nil {
+				m.logger.Errorf("error in close body %v", err)
+			}
+		}
+	}
+}
+
+func (m *TransportManager) sendMultipleMetricsV2Encrypted() {
+	var apiMetrics []protocol.Metrics
+	if m.config.SignKey != "" {
+		apiMetrics = m.metrics.ToAPIWithSign(m.config.SignKey)
+	} else {
+		apiMetrics = m.metrics.ToAPI()
+	}
+
+	for i := 0; i < len(apiMetrics); i++ {
+		if marshal, err := json.Marshal(apiMetrics[i]); err != nil {
+			m.logger.Errorf("error in Marshal metric: %v", err)
+		} else if enc, err := crypto.Encrypt(m.publicKey, marshal); err != nil {
+			m.logger.Errorf("error in encrypt msg: %v", err)
+		} else if r, err := m.client.Post(fmt.Sprintf("%s/update_enc", m.url), "application/json", bytes.NewBuffer(enc)); err != nil {
 			m.logger.Errorf("error in send metric: %v", err)
 		} else {
 			if err := r.Body.Close(); err != nil {
