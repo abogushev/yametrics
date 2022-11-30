@@ -1,4 +1,4 @@
-package durationExtension
+package durationextension
 
 import (
 	"encoding/json"
