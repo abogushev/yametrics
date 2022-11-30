@@ -83,7 +83,7 @@ func (m *TransportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 		}
 	},
 		ctx,
-		m.config.ReportInterval,
+		m.config.ReportInterval.Duration,
 		"sending metrics",
 		m.logger)
 }

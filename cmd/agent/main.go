@@ -31,20 +31,20 @@ func main() {
 	logger := l.Sugar()
 	defer logger.Sync()
 
-	configProvider := config.NewConfigProvider()
+	config := config.NewAgentConfig()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 
 	wg := &sync.WaitGroup{}
 
-	publicKey, err := crypto.ReadPublicKey(configProvider.AgentCfg.CryptoKeyPath)
+	publicKey, err := crypto.ReadPublicKey(config.CryptoKeyPath)
 	if err != nil {
 		logger.Errorf("init failed %v", err)
 	}
 
-	m := managers.NewMetricManager(logger, configProvider.AgentCfg)
-	t := managers.NewTransportManager(logger, configProvider.AgentCfg, publicKey)
+	m := managers.NewMetricManager(logger, config)
+	t := managers.NewTransportManager(logger, config, publicKey)
 
 	m.RunAsync(ctx, wg)
 	t.RunAsync(m.NotifyCh, ctx, wg)

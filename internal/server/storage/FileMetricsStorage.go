@@ -19,11 +19,11 @@ type fileMetricsStorage struct {
 	mutex   sync.Mutex
 	metrics map[string]*models.Metrics
 	logger  *zap.SugaredLogger
-	cfg     *config.MetricsStorageConfig
+	cfg     *config.ServerConfig
 }
 
 func NewFileMetricsStorage(
-	cfg *config.MetricsStorageConfig,
+	cfg *config.ServerConfig,
 	logger *zap.SugaredLogger,
 	ctx context.Context) (MetricsStorage, error) {
 	storage := &fileMetricsStorage{metrics: make(map[string]*models.Metrics), cfg: cfg, logger: logger}
@@ -85,7 +85,7 @@ func (s *fileMetricsStorage) Check() error {
 }
 
 func (s *fileMetricsStorage) runSaveMetricsJob(ctx context.Context) {
-	ticker := time.NewTicker(s.cfg.StoreInterval)
+	ticker := time.NewTicker(s.cfg.StoreInterval.Duration)
 
 	for {
 		select {
