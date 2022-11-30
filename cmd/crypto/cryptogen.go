@@ -88,7 +88,10 @@ func main() {
 		Type:  "RSA PUBLIC KEY",
 		Bytes: x509.MarshalPKCS1PublicKey(&privateKey.PublicKey),
 	})
-
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	pemPublicFile.Close()
 
 	pubkey, err := crypto.ReadPublicKey(pemPublicFile.Name())
