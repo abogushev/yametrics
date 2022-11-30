@@ -53,7 +53,7 @@ func main() {
 
 	privateKey, err := crypto.ReadPrivateKey(cfgProvider.ServerCfg.CryptoKeyPath)
 	if err != nil {
-		logger.Fatalf("error on read private key, %v", err)
+		logger.Errorf("error on read private key, %v", err)
 	}
 
 	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx, privateKey)

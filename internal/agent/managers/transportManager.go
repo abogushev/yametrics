@@ -78,7 +78,9 @@ func (m *TransportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 		m.sendMetricsV1()
 		m.sendMetricsV2()
 		m.sendMultipleMetricsV2()
-		m.sendMultipleMetricsV2Encrypted()
+		if m.publicKey != nil {
+			m.sendMultipleMetricsV2Encrypted()
+		}
 	},
 		ctx,
 		m.config.ReportInterval,

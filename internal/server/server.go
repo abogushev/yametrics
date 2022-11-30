@@ -45,24 +45,26 @@ func Run(
 		r.Post("/", handler.UpdatesV2)
 	})
 
-	r.Route("/update_enc", func(r chi.Router) {
-		r.Post("/", func(writer http.ResponseWriter, request *http.Request) {
-			encbody, err := io.ReadAll(request.Body)
-			if err != nil {
-				logger.Errorf("failed to read encrypted msg, %v", err)
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			body, err := crypto.Decrypt(privateKey, encbody)
-			if err != nil {
-				logger.Errorf("failed to deccrypte msg, %v", err)
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			request.Body = io.NopCloser(bytes.NewReader(body))
-			handler.UpdateV2(writer, request)
+	if privateKey != nil {
+		r.Route("/update_enc", func(r chi.Router) {
+			r.Post("/", func(writer http.ResponseWriter, request *http.Request) {
+				encbody, err := io.ReadAll(request.Body)
+				if err != nil {
+					logger.Errorf("failed to read encrypted msg, %v", err)
+					http.Error(writer, err.Error(), http.StatusBadRequest)
+					return
+				}
+				body, err := crypto.Decrypt(privateKey, encbody)
+				if err != nil {
+					logger.Errorf("failed to deccrypte msg, %v", err)
+					http.Error(writer, err.Error(), http.StatusBadRequest)
+					return
+				}
+				request.Body = io.NopCloser(bytes.NewReader(body))
+				handler.UpdateV2(writer, request)
+			})
 		})
-	})
+	}
 
 	r.Route("/value", func(r chi.Router) {
 		r.Get("/{type}/{name}", handler.GetV1)

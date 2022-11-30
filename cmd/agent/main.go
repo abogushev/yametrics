@@ -40,7 +40,7 @@ func main() {
 
 	publicKey, err := crypto.ReadPublicKey(configProvider.AgentCfg.CryptoKeyPath)
 	if err != nil {
-		logger.Fatalf("init failed %v", err)
+		logger.Errorf("init failed %v", err)
 	}
 
 	m := managers.NewMetricManager(logger, configProvider.AgentCfg)
