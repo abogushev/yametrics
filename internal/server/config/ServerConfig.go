@@ -5,18 +5,18 @@ import (
 	"os"
 	"strconv"
 	"time"
-	"yametrics/internal/config_file"
-	"yametrics/internal/duration_ext"
+	"yametrics/internal/configFile"
+	"yametrics/internal/durationExtension"
 )
 
 type ServerConfig struct {
-	Address       string                `env:"ADDRESS" envDefault:"127.0.0.1:8080" json:"address"`
-	SignKey       string                `env:"KEY"`
-	CryptoKeyPath string                `env:"CRYPTO_KEY" json:"crypto_key"`
-	StoreInterval duration_ext.Duration `env:"STORE_INTERVAL" envDefault:"300s" json:"store_interval"`
-	StoreFile     string                `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json" json:"store_file"`
-	Restore       bool                  `env:"RESTORE" envDefault:"true" json:"restore"`
-	DBURL         string                `env:"DATABASE_DSN" json:"database_dsn"`
+	Address       string                     `env:"ADDRESS" envDefault:"127.0.0.1:8080" json:"address"`
+	SignKey       string                     `env:"KEY"`
+	CryptoKeyPath string                     `env:"CRYPTO_KEY" json:"crypto_key"`
+	StoreInterval durationExtension.Duration `env:"STORE_INTERVAL" envDefault:"300s" json:"store_interval"`
+	StoreFile     string                     `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json" json:"store_file"`
+	Restore       bool                       `env:"RESTORE" envDefault:"true" json:"restore"`
+	DBURL         string                     `env:"DATABASE_DSN" json:"database_dsn"`
 	configPath    string
 }
 
@@ -59,7 +59,7 @@ func (cfg *ServerConfig) loadFromEnv() {
 
 func (cfg *ServerConfig) readConfigFile() {
 	if cfg.configPath != "" {
-		err := config_file.ReadConfig(cfg.configPath, cfg)
+		err := configFile.ReadConfig(cfg.configPath, cfg)
 		if err != nil {
 			panic(err)
 		}

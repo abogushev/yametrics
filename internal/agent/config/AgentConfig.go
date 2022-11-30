@@ -4,16 +4,16 @@ import (
 	"flag"
 	"os"
 	"time"
-	"yametrics/internal/config_file"
-	"yametrics/internal/duration_ext"
+	"yametrics/internal/configFile"
+	"yametrics/internal/durationExtension"
 )
 
 type AgentConfig struct {
-	Address        string                `env:"ADDRESS" envDefault:"127.0.0.1:8080" json:"address"`
-	ReportInterval duration_ext.Duration `env:"REPORT_INTERVAL" envDefault:"10s" json:"report_interval"`
-	PollInterval   duration_ext.Duration `env:"POLL_INTERVAL" envDefault:"2s" json:"poll_interval"`
-	SignKey        string                `env:"KEY"`
-	CryptoKeyPath  string                `env:"CRYPTO_KEY" json:"crypto_key"`
+	Address        string                     `env:"ADDRESS" envDefault:"127.0.0.1:8080" json:"address"`
+	ReportInterval durationExtension.Duration `env:"REPORT_INTERVAL" envDefault:"10s" json:"report_interval"`
+	PollInterval   durationExtension.Duration `env:"POLL_INTERVAL" envDefault:"2s" json:"poll_interval"`
+	SignKey        string                     `env:"KEY"`
+	CryptoKeyPath  string                     `env:"CRYPTO_KEY" json:"crypto_key"`
 	configPath     string
 }
 
@@ -51,7 +51,7 @@ func (cfg *AgentConfig) loadFromEnv() {
 
 func (cfg *AgentConfig) readConfigFile() {
 	if cfg.configPath != "" {
-		err := config_file.ReadConfig(cfg.configPath, cfg)
+		err := configFile.ReadConfig(cfg.configPath, cfg)
 		if err != nil {
 			panic(err)
 		}

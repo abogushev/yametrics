@@ -1,4 +1,4 @@
-package duration_ext
+package durationExtension
 
 import (
 	"encoding/json"
@@ -11,14 +11,14 @@ type Duration struct {
 }
 
 func (duration *Duration) UnmarshalJSON(b []byte) error {
-	var unmarshalledJson interface{}
+	var unmarshalledJSON interface{}
 
-	err := json.Unmarshal(b, &unmarshalledJson)
+	err := json.Unmarshal(b, &unmarshalledJSON)
 	if err != nil {
 		return err
 	}
 
-	switch value := unmarshalledJson.(type) {
+	switch value := unmarshalledJSON.(type) {
 	case float64:
 		duration.Duration = time.Duration(value)
 	case string:
@@ -27,7 +27,7 @@ func (duration *Duration) UnmarshalJSON(b []byte) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("invalid duration: %#v", unmarshalledJson)
+		return fmt.Errorf("invalid duration: %#v", unmarshalledJSON)
 	}
 
 	return nil
