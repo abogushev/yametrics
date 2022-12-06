@@ -8,14 +8,31 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 	"yametrics/internal/agent/utils"
 	"yametrics/internal/crypto"
+	"yametrics/internal/iputils"
 	"yametrics/internal/protocol"
 
 	"go.uber.org/zap"
 )
+
+type customHeaderRoundTriper struct {
+	target http.RoundTripper
+	logger *zap.SugaredLogger
+}
+
+func (c *customHeaderRoundTriper) RoundTrip(r *http.Request) (*http.Response, error) {
+	ip, err := iputils.LocalIP()
+	if err != nil {
+		c.logger.Errorf("can't get ip, %v", err)
+	} else {
+		r.Header.Set("X-Real-IP", ip.String())
+	}
+	return c.target.RoundTrip(r)
+}
 
 // TransportManager менеджер отправки данных на сервер
 type TransportManager struct {
@@ -34,7 +51,7 @@ type TransportManager struct {
 func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig, pubKey *rsa.PublicKey) *TransportManager {
 	return &TransportManager{
 		url:       "http://" + config.Address,
-		client:    http.Client{},
+		client:    http.Client{&customHeaderRoundTriper{http.DefaultTransport, l}, nil, nil, 5 * time.Second},
 		logger:    l,
 		metrics:   storage.NewMetrics(),
 		config:    config,

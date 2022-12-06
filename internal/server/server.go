@@ -5,18 +5,38 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"yametrics/internal/crypto"
+	"yametrics/internal/iputils"
 	"yametrics/internal/server/config"
 	"yametrics/internal/server/handlers"
 	"yametrics/internal/server/storage"
-
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-	"go.uber.org/zap"
 )
+
+func checkIP(trustedSubnet string, logger *zap.SugaredLogger) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if len(trustedSubnet) != 0 {
+				clientIP := r.Header.Get("X-Real-IP")
+				if len(clientIP) != 0 {
+					ok, err := iputils.CheckIP(clientIP, trustedSubnet)
+					if err != nil {
+						logger.Errorf("failed to check ip, %v", err)
+					} else if !ok {
+						rw.WriteHeader(http.StatusForbidden)
+						return
+					}
+				}
+			}
+			next.ServeHTTP(rw, r)
+		})
+	}
+}
 
 // Run - запуск сервера
 func Run(
@@ -34,6 +54,7 @@ func Run(
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
+	r.Use(checkIP(cfg.TrustedSubnet, logger))
 
 	r.Route("/update", func(r chi.Router) {
 		r.Post("/{type:gauge|counter}/{name}/{value}", handler.UpdateV1)
