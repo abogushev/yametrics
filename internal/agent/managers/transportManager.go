@@ -51,7 +51,7 @@ type TransportManager struct {
 func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig, pubKey *rsa.PublicKey) *TransportManager {
 	return &TransportManager{
 		url:       "http://" + config.Address,
-		client:    http.Client{&customHeaderRoundTriper{http.DefaultTransport, l}, nil, nil, 5 * time.Second},
+		client:    http.Client{Transport: &customHeaderRoundTriper{target: http.DefaultTransport, logger: l}, Timeout: 5 * time.Second},
 		logger:    l,
 		metrics:   storage.NewMetrics(),
 		config:    config,
