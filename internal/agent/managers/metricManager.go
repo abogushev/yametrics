@@ -103,7 +103,7 @@ func (m *MetricManager) updateAdditionalMetricsWithInterval(ctx context.Context,
 			m.syncCh <- Additional
 		},
 		ctx,
-		m.config.PollInterval,
+		m.config.PollInterval.Duration,
 		"collecting additional metrics",
 		m.logger)
 }
@@ -123,7 +123,7 @@ func (m *MetricManager) updateMetricsWithInterval(ctx context.Context, wg *sync.
 			m.syncCh <- General
 		},
 		ctx,
-		m.config.PollInterval,
+		m.config.PollInterval.Duration,
 		"collecting metrics",
 		m.logger)
 }

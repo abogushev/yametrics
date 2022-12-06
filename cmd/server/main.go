@@ -7,6 +7,7 @@ import (
 	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
+	"yametrics/internal/crypto"
 
 	"go.uber.org/zap"
 
@@ -36,20 +37,25 @@ func main() {
 	logger := l.Sugar()
 	defer logger.Sync()
 
-	cfgProvider := config.NewConfigProvider()
+	cfg := config.NewServerConfig()
 
 	var metricstorage storage.MetricsStorage
 
-	if len(cfgProvider.StorageCfg.DBURL) != 0 {
-		metricstorage, err = storage.NewDBMetricStorage(cfgProvider.StorageCfg.DBURL, ctx, logger)
+	if len(cfg.DBURL) != 0 {
+		metricstorage, err = storage.NewDBMetricStorage(cfg.DBURL, ctx, logger)
 	} else {
-		metricstorage, err = storage.NewFileMetricsStorage(cfgProvider.StorageCfg, logger, ctx)
+		metricstorage, err = storage.NewFileMetricsStorage(cfg, logger, ctx)
 	}
 	logger.Info("storage started successful")
 	if err != nil {
 		logger.Fatalf("error on create metric storage %v", err)
 	}
 
-	server.Run(logger, cfgProvider.ServerCfg, metricstorage, ctx)
+	privateKey, err := crypto.ReadPrivateKey(cfg.CryptoKeyPath)
+	if err != nil {
+		logger.Errorf("error on read private key, %v", err)
+	}
+
+	server.Run(logger, cfg, metricstorage, ctx, privateKey)
 	metricstorage.Close()
 }
