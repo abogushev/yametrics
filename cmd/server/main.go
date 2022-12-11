@@ -57,7 +57,7 @@ func main() {
 		logger.Errorf("error on read private key, %v", err)
 	}
 
-	go grpc.RunMetricsServer(logger, ctx)
+	go grpc.RunMetricsServer(logger, ctx, metricstorage)
 	server.Run(logger, cfg, metricstorage, ctx, privateKey)
 	metricstorage.Close()
 }

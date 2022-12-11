@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -10,13 +9,17 @@ import (
 	"io"
 	"net"
 	pb "yametrics/internal/protocol/proto"
+	"yametrics/internal/server/models"
+	"yametrics/internal/server/storage"
 )
 
 type MetricsServer struct {
 	pb.UnimplementedMetricsServer
+	logger         *zap.SugaredLogger
+	metricsStorage storage.MetricsStorage
 }
 
-func RunMetricsServer(logger *zap.SugaredLogger, ctx context.Context) {
+func RunMetricsServer(logger *zap.SugaredLogger, ctx context.Context, metricsStorage storage.MetricsStorage) {
 	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
 	if err != nil {
 		logger.Fatalf("Failed to setup TLS: %v", err)
@@ -30,7 +33,7 @@ func RunMetricsServer(logger *zap.SugaredLogger, ctx context.Context) {
 	// создаём gRPC-сервер без зарегистрированной службы
 	server := grpc.NewServer(grpc.Creds(creds))
 	// регистрируем сервис
-	pb.RegisterMetricsServer(server, &MetricsServer{})
+	pb.RegisterMetricsServer(server, &MetricsServer{logger: logger, metricsStorage: metricsStorage})
 
 	logger.Info("Сервер gRPC начал работу")
 	// получаем запрос gRPC
@@ -45,14 +48,34 @@ func RunMetricsServer(logger *zap.SugaredLogger, ctx context.Context) {
 }
 
 func (s *MetricsServer) SaveMetrics(stream pb.Metrics_SaveMetricsServer) error {
+	mtrcs := make([]models.Metrics, 0)
+
 	for {
 		metric, err := stream.Recv()
+
 		if err == io.EOF {
+			err = s.metricsStorage.Updates(mtrcs)
+			if err != nil {
+				return err
+			}
+			s.logger.Info("metrics saved successful")
 			return stream.SendAndClose(&emptypb.Empty{})
 		}
 		if err != nil {
 			return err
 		}
-		fmt.Println(metric.Id)
+		t := ""
+		switch metric.Type {
+		case 0:
+			t = "counter"
+		case 1:
+			t = "gauge"
+		}
+		mtrcs = append(mtrcs, models.Metrics{
+			ID:    metric.Id,
+			MType: t,
+			Delta: metric.Delta,
+			Value: metric.Value,
+		})
 	}
 }
