@@ -4,7 +4,7 @@ import (
 	"context"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"yametrics/internal/agent/models/storage"
 	pb "yametrics/internal/protocol/proto"
 )
@@ -18,15 +18,23 @@ func NewGRPCTransportManager(logger *zap.SugaredLogger) *GRPCTransportManager {
 }
 
 func (t *GRPCTransportManager) Send(ctx context.Context, metrics *storage.Metrics) error {
-	conn, err := grpc.Dial(":3200", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
+	if err != nil {
+		t.logger.Errorf("could not process the credentials: %v", err)
+		return err
+	}
+
+	conn, err := grpc.Dial(":3200", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		t.logger.Error(err)
+		return err
 	}
 	defer conn.Close()
 	c := pb.NewMetricsClient(conn)
 	stream, err := c.SaveMetrics(ctx)
 	if err != nil {
 		t.logger.Error(err)
+		return err
 	}
 
 	metricsForSend := make([]*pb.Metric, 0)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"net"
@@ -16,6 +17,10 @@ type MetricsServer struct {
 }
 
 func RunMetricsServer(logger *zap.SugaredLogger, ctx context.Context) {
+	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+	if err != nil {
+		logger.Fatalf("Failed to setup TLS: %v", err)
+	}
 	// определяем порт для сервера
 	listen, err := net.Listen("tcp", ":3200")
 	if err != nil {
@@ -23,7 +28,7 @@ func RunMetricsServer(logger *zap.SugaredLogger, ctx context.Context) {
 		return
 	}
 	// создаём gRPC-сервер без зарегистрированной службы
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.Creds(creds))
 	// регистрируем сервис
 	pb.RegisterMetricsServer(server, &MetricsServer{})
 
