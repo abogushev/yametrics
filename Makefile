@@ -6,6 +6,11 @@ server_heap_out_file = server_heap.out
 trace_fn = go tool pprof -http=\":9090\" -seconds=120 http://localhost:$(1)/debug/pprof/$(2)
 trace_and_save_fn = curl -sK -v http://localhost:$(1)/debug/pprof/$(2)?seconds=300 > profiles/$(3) && go tool pprof -http=":9090" profiles/$(3)
 
+proto_gen:
+	protoc --go_out=. --go_opt=paths=source_relative \
+      --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+      internal/protocol/proto/metrics.proto
+
 client_run:
 	# go run cmd/agent/main.go
 	go run -ldflags "-X main.buildVersion=$$(cat cmd/agent/version.txt) -X 'main.buildDate=$$(date +'%d/%m/%Y')' -X 'main.buildCommit=$$(git rev-parse HEAD)'" cmd/agent/main.go
