@@ -8,37 +8,56 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 	"yametrics/internal/agent/config"
 	"yametrics/internal/agent/models/storage"
 	"yametrics/internal/agent/utils"
 	"yametrics/internal/crypto"
+	"yametrics/internal/iputils"
 	"yametrics/internal/protocol"
 
 	"go.uber.org/zap"
 )
 
+type customHeaderRoundTriper struct {
+	target http.RoundTripper
+	logger *zap.SugaredLogger
+}
+
+func (c *customHeaderRoundTriper) RoundTrip(r *http.Request) (*http.Response, error) {
+	ip, err := iputils.LocalIP()
+	if err != nil {
+		c.logger.Errorf("can't get ip, %v", err)
+	} else {
+		r.Header.Set("X-Real-IP", ip.String())
+	}
+	return c.target.RoundTrip(r)
+}
+
 // TransportManager менеджер отправки данных на сервер
 type TransportManager struct {
-	url       string
-	client    http.Client
-	logger    *zap.SugaredLogger
-	config    *config.AgentConfig
-	metrics   *storage.Metrics
-	rwMutex   sync.RWMutex
-	once      sync.Once
-	publicKey *rsa.PublicKey
+	url           string
+	client        http.Client
+	logger        *zap.SugaredLogger
+	config        *config.AgentConfig
+	metrics       *storage.Metrics
+	rwMutex       sync.RWMutex
+	once          sync.Once
+	publicKey     *rsa.PublicKey
+	grpcTransport *GRPCTransportManager
 }
 
 // NewTransportManager - создание менеджера отправки метрик.
 // для запуска менеждера необходимо вызвать RunAsync.
 func NewTransportManager(l *zap.SugaredLogger, config *config.AgentConfig, pubKey *rsa.PublicKey) *TransportManager {
 	return &TransportManager{
-		url:       "http://" + config.Address,
-		client:    http.Client{},
-		logger:    l,
-		metrics:   storage.NewMetrics(),
-		config:    config,
-		publicKey: pubKey,
+		url:           "http://" + config.Address,
+		client:        http.Client{Transport: &customHeaderRoundTriper{target: http.DefaultTransport, logger: l}, Timeout: 5 * time.Second},
+		logger:        l,
+		metrics:       storage.NewMetrics(),
+		config:        config,
+		publicKey:     pubKey,
+		grpcTransport: NewGRPCTransportManager(l),
 	}
 }
 
@@ -78,6 +97,8 @@ func (m *TransportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 		m.sendMetricsV1()
 		m.sendMetricsV2()
 		m.sendMultipleMetricsV2()
+		m.sendMetricsGRPC(ctx)
+
 		if m.publicKey != nil {
 			m.sendMultipleMetricsV2Encrypted()
 		}
@@ -86,6 +107,15 @@ func (m *TransportManager) sendMetricsWithInterval(ctx context.Context, wg *sync
 		m.config.ReportInterval.Duration,
 		"sending metrics",
 		m.logger)
+}
+
+func (m *TransportManager) sendMetricsGRPC(ctx context.Context) {
+	err := m.grpcTransport.Send(ctx, m.metrics)
+	if err != nil {
+		m.logger.Errorf("GRPC: error in send metric: %v", err)
+	} else {
+		m.logger.Info("GRPC: metric send successful")
+	}
 }
 
 func (m *TransportManager) sendMultipleMetricsV2() {

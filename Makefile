@@ -6,6 +6,19 @@ server_heap_out_file = server_heap.out
 trace_fn = go tool pprof -http=\":9090\" -seconds=120 http://localhost:$(1)/debug/pprof/$(2)
 trace_and_save_fn = curl -sK -v http://localhost:$(1)/debug/pprof/$(2)?seconds=300 > profiles/$(3) && go tool pprof -http=":9090" profiles/$(3)
 
+gen_cert:
+	openssl genrsa -out cert/ca.key 4096
+	openssl req -new -x509 -key cert/ca.key -sha256 -subj "/C=US/ST=NJ/O=CA, Inc." -days 365 -out cert/ca.cert
+	openssl genrsa -out cert/service.key 4096
+	openssl req -new -key cert/service.key -out cert/service.csr -config cert/cert.conf
+	openssl x509 -req -in cert/service.csr -CA cert/ca.cert -CAkey cert/ca.key -CAcreateserial \
+		-out cert/service.pem -days 365 -sha256 -extfile cert/cert.conf -extensions req_ext
+
+proto_gen:
+	protoc --go_out=. --go_opt=paths=source_relative \
+      --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+      internal/protocol/proto/metrics.proto
+
 client_run:
 	# go run cmd/agent/main.go
 	go run -ldflags "-X main.buildVersion=$$(cat cmd/agent/version.txt) -X 'main.buildDate=$$(date +'%d/%m/%Y')' -X 'main.buildCommit=$$(git rev-parse HEAD)'" cmd/agent/main.go

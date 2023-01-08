@@ -8,12 +8,13 @@ import (
 	"os/signal"
 	"syscall"
 	"yametrics/internal/crypto"
+	"yametrics/internal/server"
 
 	"go.uber.org/zap"
 
 	"yametrics/internal/metainfo"
-	"yametrics/internal/server"
 	"yametrics/internal/server/config"
+	"yametrics/internal/server/grpc"
 	"yametrics/internal/server/storage"
 )
 
@@ -56,6 +57,7 @@ func main() {
 		logger.Errorf("error on read private key, %v", err)
 	}
 
+	go grpc.RunMetricsServer(logger, ctx, metricstorage)
 	server.Run(logger, cfg, metricstorage, ctx, privateKey)
 	metricstorage.Close()
 }

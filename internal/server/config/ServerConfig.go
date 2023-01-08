@@ -17,6 +17,7 @@ type ServerConfig struct {
 	StoreFile     string                     `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json" json:"store_file"`
 	Restore       bool                       `env:"RESTORE" envDefault:"true" json:"restore"`
 	DBURL         string                     `env:"DATABASE_DSN" json:"database_dsn"`
+	TrustedSubnet string                     `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	configPath    string
 }
 
@@ -39,6 +40,7 @@ func (cfg *ServerConfig) defineFlags() {
 	flag.BoolVar(&cfg.Restore, "r", true, "restore metrics ?")
 	flag.StringVar(&cfg.DBURL, "d", "", "db connection url, exmlp: postgres://username:password@localhost:5432/database_name")
 	flag.StringVar(&cfg.configPath, "c", "", "path to config file")
+	flag.StringVar(&cfg.configPath, "t", "", "trusted subnet")
 }
 
 func (cfg *ServerConfig) loadFromEnv() {
@@ -55,6 +57,7 @@ func (cfg *ServerConfig) loadFromEnv() {
 	setIfDefined("STORE_FILE", func(v string) { cfg.StoreFile = v })
 	setIfDefined("RESTORE", func(v string) { cfg.Restore, _ = strconv.ParseBool(v) })
 	setIfDefined("DATABASE_DSN", func(v string) { cfg.DBURL = v })
+	setIfDefined("TRUSTED_SUBNET", func(v string) { cfg.TrustedSubnet = v })
 }
 
 func (cfg *ServerConfig) readConfigFile() {
